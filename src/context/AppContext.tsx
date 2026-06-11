@@ -339,6 +339,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const persistedRewardIds = useRef<Set<string>>(new Set());
   const persistedAchievementIds = useRef<Set<string>>(new Set());
   const lastSavedUser = useRef<{ xp: number; level: number; streak: number; is_admin: boolean; last_login: string } | null>(null);
+  const lastSavedLeaderboardUsers = useRef<User[] | null>(null);
 
   // Sync state to local storage as fallback cache
   useEffect(() => {
@@ -437,16 +438,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (!dbUser) throw new Error('Failed to resolve user from database');
 
-        // 3. Fetch relational progress data from Supabase
-        const [progressRes, achievementsRes, rewardsRes] = await Promise.all([
+        // 3. Fetch relational progress data and all users from Supabase
+        const [progressRes, achievementsRes, rewardsRes, usersRes] = await Promise.all([
           supabase.from('lesson_progress').select('*').eq('user_id', dbUser.id),
           supabase.from('user_achievements').select('*').eq('user_id', dbUser.id),
-          supabase.from('daily_rewards').select('*').eq('user_id', dbUser.id)
+          supabase.from('daily_rewards').select('*').eq('user_id', dbUser.id),
+          supabase.from('users').select('*')
         ]);
 
         const lessonProgress = progressRes.data || [];
         const userAchievements = achievementsRes.data || [];
         const dailyRewards = rewardsRes.data || [];
+        const allUsers = usersRes.data || [];
+
+        // Filter out current user from leaderboardUsers to avoid duplicate rendering
+        const leaderboardUsers = allUsers.filter(u => u.id !== dbUser.id).map(u => ({
+          id: u.id,
+          telegram_id: u.telegram_id,
+          username: u.username || 'telegram_user',
+          first_name: u.first_name || 'Trader',
+          avatar: u.avatar || '',
+          level: u.level || 1,
+          xp: u.xp || 0,
+          streak: u.streak || 0,
+          last_login: u.last_login || new Date().toISOString(),
+          created_at: u.created_at || new Date().toISOString(),
+          is_admin: u.is_admin || false,
+          is_banned: u.is_banned || false
+        }));
 
         // 4. Update local tracking refs to prevent re-writes on load
         lessonProgress.forEach(p => persistedProgressIds.current.add(p.id));
@@ -459,6 +478,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           is_admin: dbUser.is_admin,
           last_login: dbUser.last_login
         };
+        lastSavedLeaderboardUsers.current = leaderboardUsers.map(u => ({ ...u }));
 
         // 5. Load state to context
         dispatch({
@@ -478,6 +498,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               is_admin: dbUser.is_admin,
               is_banned: dbUser.is_banned
             },
+            leaderboardUsers: leaderboardUsers,
             lessonProgress: lessonProgress.map(p => ({
               id: p.id,
               user_id: p.user_id,
@@ -598,10 +619,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
           console.error('Failed to sync user profile:', err);
         }
       }
+
+      // 5. Sync other users' changes (from Admin Panel edits like XP grant or bans)
+      if (lastSavedLeaderboardUsers.current) {
+        for (const user of state.leaderboardUsers) {
+          const last = lastSavedLeaderboardUsers.current.find(lu => lu.id === user.id);
+          if (last && (user.xp !== last.xp || user.level !== last.level || user.is_banned !== last.is_banned)) {
+            try {
+              await supabase
+                .from('users')
+                .update({
+                  xp: user.xp,
+                  level: user.level,
+                  is_banned: user.is_banned
+                })
+                .eq('id', user.id);
+            } catch (err) {
+              console.error('Failed to sync other user changes from admin:', err);
+            }
+          }
+        }
+      }
+      lastSavedLeaderboardUsers.current = state.leaderboardUsers.map(lu => ({ ...lu }));
     };
 
     syncToDatabase();
-  }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards]);
+  }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards, state.leaderboardUsers]);
 
   // Helpers
   const getModuleProgress = (moduleId: string): number => {
