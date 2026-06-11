@@ -16,6 +16,8 @@ interface AppState {
   leaderboardUsers: User[];
   notifications: AppNotification[];
   isLoading: boolean;
+  isMember: boolean;
+  isCheckingMembership: boolean;
 }
 
 // ===== Actions =====
@@ -52,6 +54,8 @@ const initialState: AppState = {
   leaderboardUsers: MOCK_LEADERBOARD_USERS,
   notifications: [],
   isLoading: false,
+  isMember: true,
+  isCheckingMembership: false,
 };
 
 // ===== Reducer =====
@@ -298,15 +302,17 @@ const getStorageKey = (): string => {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState, (initial) => {
+    const tg = window.Telegram?.WebApp;
+    const hasInitData = !!tg?.initData;
+    let result = { ...initial };
     try {
-      const tg = window.Telegram?.WebApp;
       const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
       const actualKey = tgUserId ? `academy_hub_state_tg_${tgUserId}` : 'academy_hub_state_v3';
       
       const saved = localStorage.getItem(actualKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        return {
+        result = {
           ...initial,
           user: parsed.user || initial.user,
           lessonProgress: parsed.lessonProgress || [],
@@ -317,7 +323,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         };
       } else if (tgUserId) {
         // Initialize new Telegram user session
-        return {
+        result = {
           ...initial,
           user: {
             ...initial.user,
@@ -331,7 +337,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-    return initial;
+    return {
+      ...result,
+      isMember: !hasInitData, // Bypass check for local development
+      isCheckingMembership: hasInitData,
+    };
   });
 
   const isLoadedRef = useRef(false);
@@ -372,8 +382,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const GROUP_CHAT_ID = '-1003872191165'; // Academy group chat ID
 
       try {
-        // 1. Fetch check-admin status first
+        // 1. Fetch check-admin and check-membership status first
         let isAdmin = false;
+        let isMember = true;
         if (tg?.initData) {
           try {
             const response = await fetch('/api/check-admin', {
@@ -387,9 +398,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
             });
             const data = await response.json();
             isAdmin = data?.isAdmin || false;
+            isMember = data?.isMember ?? true;
           } catch (err) {
-            console.error('Admin verification check failed:', err);
+            console.error('Admin/membership verification check failed:', err);
           }
+        }
+
+        // If not a member, immediately lock the app and stop execution
+        if (!isMember) {
+          dispatch({
+            type: 'LOAD_STATE',
+            payload: {
+              isMember: false,
+              isCheckingMembership: false,
+            }
+          });
+          isLoadedRef.current = true;
+          return;
         }
 
         // 2. Fetch or create user in Supabase users table
@@ -499,6 +524,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               is_banned: dbUser.is_banned
             },
             leaderboardUsers: leaderboardUsers,
+            isMember: true,
+            isCheckingMembership: false,
             lessonProgress: lessonProgress.map(p => ({
               id: p.id,
               user_id: p.user_id,
@@ -530,6 +557,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error('Supabase synchronization bootstrap failed:', err);
         // Fallback: update local streak and let user play locally
         dispatch({ type: 'UPDATE_STREAK' });
+        dispatch({
+          type: 'LOAD_STATE',
+          payload: {
+            isCheckingMembership: false,
+          }
+        });
         isLoadedRef.current = true;
       }
     };

@@ -56,14 +56,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ isAdmin: false });
     }
     
-    // 3. Các role được phép làm Admin
+    // 3. Các role được phép làm Admin và Member
     const adminStatuses = ['creator', 'administrator'];
-    const isAdmin = adminStatuses.includes(data.result.status);
+    const memberStatuses = ['creator', 'administrator', 'member', 'restricted'];
     
-    return res.status(200).json({ isAdmin });
+    const status = data.result?.status;
+    const isMember = data.ok && memberStatuses.includes(status);
+    const isAdmin = data.ok && adminStatuses.includes(status);
+    
+    return res.status(200).json({ isMember, isAdmin });
     
   } catch (error) {
     console.error('getChatMember error:', error);
-    return res.status(500).json({ isAdmin: false, error: error.message });
+    return res.status(500).json({ isMember: false, isAdmin: false, error: error.message });
   }
 }
