@@ -89,6 +89,7 @@ export default function RewardsPage() {
                 day={day}
                 xpReward={xp}
                 claimed={isClaimed}
+                isClaimable={isClaimable}
                 onClaim={isClaimable ? handleClaimDaily : () => {}}
               />
             );
@@ -111,6 +112,7 @@ export default function RewardsPage() {
                 day={day}
                 xpReward={xp}
                 claimed={isClaimed}
+                isClaimable={isClaimable}
                 onClaim={isClaimable ? handleClaimDaily : () => {}}
               />
             );
