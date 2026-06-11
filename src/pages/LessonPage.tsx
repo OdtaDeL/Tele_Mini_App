@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { generateId, getLevelFromXP } from '../utils/helpers';
@@ -86,8 +86,7 @@ export default function LessonPage() {
   // Simple markdown-like rendering
   const renderContent = (content: string) => {
     const lines = content.trim().split('\n');
-    const elements: JSX.Element[] = [];
-    let inList = false;
+    const elements: React.ReactElement[] = [];
     let listItems: string[] = [];
     let listOrdered = false;
 
@@ -111,7 +110,6 @@ export default function LessonPage() {
           );
         }
         listItems = [];
-        inList = false;
       }
     };
 
@@ -166,13 +164,11 @@ export default function LessonPage() {
 
       // List items
       if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-        inList = true;
         listOrdered = false;
         listItems.push(trimmed.slice(2));
         continue;
       }
       if (/^\d+\.\s/.test(trimmed)) {
-        inList = true;
         listOrdered = true;
         listItems.push(trimmed.replace(/^\d+\.\s/, ''));
         continue;

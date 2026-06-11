@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import BottomNav from './components/BottomNav';
@@ -15,6 +16,17 @@ import UserManager from './pages/admin/UserManager';
 import LeaderboardManager from './pages/admin/LeaderboardManager';
 
 export default function App() {
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();                    // Báo Telegram app đã load xong
+      tg.expand();                   // Mở full screen
+      tg.setHeaderColor('#0a0e1a'); // Dark header
+      tg.setBackgroundColor('#0a0e1a');
+      tg.enableClosingConfirmation(); // Hỏi trước khi đóng
+    }
+  }, []);
+
   return (
     <AppProvider>
       <BrowserRouter>

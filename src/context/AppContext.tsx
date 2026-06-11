@@ -86,7 +86,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         : [...state.lessonProgress, newProgress];
 
       const newXP = state.user.xp + xpReward;
-      const newLevel = getLevelFromXP(newXP);
 
       // Check if module is completed
       const lesson = state.lessons.find(l => l.id === lessonId);
@@ -332,26 +331,75 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'UPDATE_STREAK' });
   }, []);
 
+  // Sync Telegram user and check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      const tg = window.Telegram?.WebApp;
+      if (!tg?.initDataUnsafe?.user) return;
+
+      const telegramId = tg.initDataUnsafe.user.id.toString();
+      const GROUP_CHAT_ID = '-1003872191165'; // Academy group chat ID
+
+      // Create updated user with telegram details
+      const updatedUser = {
+        ...state.user,
+        telegram_id: telegramId,
+        first_name: tg.initDataUnsafe.user.first_name,
+        username: tg.initDataUnsafe.user.username || 'telegram_user',
+      };
+
+      // Set user immediately
+      dispatch({ type: 'SET_USER', payload: updatedUser });
+
+      try {
+        const response = await fetch('/api/check-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId,
+            groupId: GROUP_CHAT_ID,
+            initData: tg.initData,
+          }),
+        });
+
+        const data = await response.json();
+        if (data && typeof data.isAdmin === 'boolean') {
+          dispatch({
+            type: 'SET_USER',
+            payload: {
+              ...updatedUser,
+              is_admin: data.isAdmin,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Admin verification check failed:', err);
+      }
+    };
+
+    checkAdminStatus();
+  }, []);
+
   // Helpers
   const getModuleProgress = (moduleId: string): number => {
-    const moduleLessons = state.lessons.filter(l => l.module_id === moduleId);
+    const moduleLessons = state.lessons.filter((l: Lesson) => l.module_id === moduleId);
     if (moduleLessons.length === 0) return 0;
     const completed = state.lessonProgress.filter(
-      p => p.status === 'completed' && moduleLessons.some(ml => ml.id === p.lesson_id)
+      (p: LessonProgress) => p.status === 'completed' && moduleLessons.some((ml: Lesson) => ml.id === p.lesson_id)
     );
     return Math.round((completed.length / moduleLessons.length) * 100);
   };
 
   const getLessonStatus = (lessonId: string): 'not_started' | 'in_progress' | 'completed' => {
     const progress = state.lessonProgress.find(
-      p => p.lesson_id === lessonId && p.user_id === state.user.id
+      (p: LessonProgress) => p.lesson_id === lessonId && p.user_id === state.user.id
     );
     return progress?.status || 'not_started';
   };
 
   const getCompletedLessonsCount = (): number => {
     return state.lessonProgress.filter(
-      p => p.status === 'completed' && p.user_id === state.user.id
+      (p: LessonProgress) => p.status === 'completed' && p.user_id === state.user.id
     ).length;
   };
 
@@ -365,7 +413,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const hasClaimedToday = (): boolean => {
     return state.dailyRewards.some(
-      r => r.user_id === state.user.id && isToday(r.claimed_at)
+      (r: DailyReward) => r.user_id === state.user.id && isToday(r.claimed_at)
     );
   };
 
@@ -375,8 +423,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const getDailyRewardDay = (): number => {
     const rewards = state.dailyRewards
-      .filter(r => r.user_id === state.user.id)
-      .sort((a, b) => new Date(b.claimed_at).getTime() - new Date(a.claimed_at).getTime());
+      .filter((r: DailyReward) => r.user_id === state.user.id)
+      .sort((a: DailyReward, b: DailyReward) => new Date(b.claimed_at).getTime() - new Date(a.claimed_at).getTime());
 
     if (rewards.length === 0) return 0;
     const last = rewards[0];
@@ -394,7 +442,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     for (const achievement of state.achievements) {
       const alreadyEarned = state.userAchievements.some(
-        ua => ua.achievement_id === achievement.id && ua.user_id === state.user.id
+        (ua: UserAchievement) => ua.achievement_id === achievement.id && ua.user_id === state.user.id
       );
       if (alreadyEarned) continue;
 
