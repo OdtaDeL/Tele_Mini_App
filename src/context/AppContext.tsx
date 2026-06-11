@@ -112,12 +112,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'CLAIM_DAILY_REWARD': {
       const todayReward = state.dailyRewards.find(
-        r => r.user_id === state.user.id && isToday(r.claimed_at)
+        r => isToday(r.claimed_at)
       );
       if (todayReward) return state;
 
-      const streakRewards = state.dailyRewards
-        .filter(r => r.user_id === state.user.id)
+      const streakRewards = [...state.dailyRewards]
         .sort((a, b) => new Date(b.claimed_at).getTime() - new Date(a.claimed_at).getTime());
 
       let currentDay = 0;
@@ -413,7 +412,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const hasClaimedToday = (): boolean => {
     return state.dailyRewards.some(
-      (r: DailyReward) => r.user_id === state.user.id && isToday(r.claimed_at)
+      (r: DailyReward) => isToday(r.claimed_at)
     );
   };
 
@@ -422,8 +421,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const getDailyRewardDay = (): number => {
-    const rewards = state.dailyRewards
-      .filter((r: DailyReward) => r.user_id === state.user.id)
+    const rewards = [...state.dailyRewards]
       .sort((a: DailyReward, b: DailyReward) => new Date(b.claimed_at).getTime() - new Date(a.claimed_at).getTime());
 
     if (rewards.length === 0) return 0;

@@ -13,7 +13,7 @@ export default function NotificationToast() {
       const latest = achievementNotifications[achievementNotifications.length - 1];
       const timer = setTimeout(() => {
         dispatch({ type: 'DISMISS_NOTIFICATION', payload: latest.id });
-      }, 5000); // Auto dismiss after 5 seconds
+      }, 8000); // Auto dismiss after 5 seconds
       return () => clearTimeout(timer);
     }
   }, [achievementNotifications, dispatch]);
@@ -21,7 +21,7 @@ export default function NotificationToast() {
   if (achievementNotifications.length === 0) return null;
 
   const latest = achievementNotifications[achievementNotifications.length - 1];
-  
+
   // Clean up clean message (e.g. remove "Achievement unlocked: ")
   const achievementTitle = latest.message.replace('Achievement unlocked: ', '').replace('!', '');
 
@@ -99,7 +99,7 @@ export default function NotificationToast() {
               textShadow: '0 0 5px rgba(255, 215, 0, 0.3)',
             }}
           >
-            🏆 Thành Tích Mới!
+            🏆 New Achievement!
           </h4>
           <p
             style={{
@@ -119,7 +119,7 @@ export default function NotificationToast() {
               marginTop: '2px',
             }}
           >
-            Đã mở khóa phần thưởng thành tích
+            Unlocked achievement reward
           </span>
         </div>
 
