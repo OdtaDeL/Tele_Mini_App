@@ -533,9 +533,22 @@ export const supabase = createClient(
 
 ### Supabase (Optional)
 - [ ] Tạo project Supabase
-- [ ] Chạy SQL tạo tables
+- [ ] Chạy SQL tạo tables (hoặc dùng script tự động bên dưới)
 - [ ] Thêm credentials vào `.env`
 - [ ] Thay thế localStorage trong `AppContext.tsx` bằng Supabase queries
+
+### 🛠️ Script Khởi Tạo & Seed Database Tự Động
+Để đơn giản hóa quá trình tạo bảng và đồng bộ dữ liệu ban đầu, bạn có thể chạy script `scripts/setup-db.ts` đã được chuẩn bị sẵn. Script này sẽ:
+1. Tạo đầy đủ các bảng (`users`, `modules`, `lessons`, `lesson_progress`, `achievements`, `user_achievements`, `daily_rewards`).
+2. Tự động chuyển đổi các ID khóa chính thành kiểu `TEXT` để khớp hoàn hảo với code của ứng dụng React (tránh lỗi UUID đúc sai định dạng `'mod_001'`, `'les_001'`,...).
+3. Tắt RLS (Row Level Security) để client-side có thể đồng bộ lưu tiến trình học, điểm danh và thành tựu trực tiếp mà không bị lỗi phân quyền.
+4. Đẩy toàn bộ dữ liệu mẫu (modules, bài học, thành tựu) từ `mockData.ts` vào database.
+
+**Cách chạy:**
+Chạy lệnh sau trên terminal của máy tính (thay `YOUR_PASSWORD` bằng mật khẩu database Supabase của bạn):
+```bash
+npx tsx scripts/setup-db.ts "postgresql://postgres:YOUR_PASSWORD@db.yvtqofadqyqlbfdvdbzh.supabase.co:5432/postgres"
+```
 
 ---
 

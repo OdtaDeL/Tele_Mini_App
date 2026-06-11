@@ -1,7 +1,8 @@
-import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
 import type { User, Module, Lesson, LessonProgress, Achievement, UserAchievement, DailyReward, AppNotification } from '../types';
 import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS, MOCK_ACHIEVEMENTS, MOCK_LEADERBOARD_USERS } from '../data/mockData';
 import { getLevelFromXP, generateId, isToday, isYesterday, DAILY_REWARD_XP, XP_REWARDS } from '../utils/helpers';
+import { supabase } from '../services/supabase';
 
 // ===== State Shape =====
 interface AppState {
@@ -333,7 +334,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return initial;
   });
 
-  // Persist to localStorage
+  const isLoadedRef = useRef(false);
+  const persistedProgressIds = useRef<Set<string>>(new Set());
+  const persistedRewardIds = useRef<Set<string>>(new Set());
+  const persistedAchievementIds = useRef<Set<string>>(new Set());
+  const lastSavedUser = useRef<{ xp: number; level: number; streak: number; is_admin: boolean; last_login: string } | null>(null);
+
+  // Sync state to local storage as fallback cache
   useEffect(() => {
     const actualKey = getStorageKey();
     const toSave = {
@@ -347,60 +354,254 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(actualKey, JSON.stringify(toSave));
   }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards, state.modules, state.lessons]);
 
-  // Update streak on mount
+  // Sync Telegram user, bootstrap Supabase data and verify Admin role
   useEffect(() => {
-    dispatch({ type: 'UPDATE_STREAK' });
-  }, []);
-
-  // Sync Telegram user and check admin status
-  useEffect(() => {
-    const checkAdminStatus = async () => {
+    const bootstrapUser = async () => {
       const tg = window.Telegram?.WebApp;
-      if (!tg?.initDataUnsafe?.user) return;
+      let telegramId = '123456789'; // Default fallback
+      let firstName = 'Trader';
+      let username = 'trader_user';
 
-      const telegramId = tg.initDataUnsafe.user.id.toString();
+      if (tg?.initDataUnsafe?.user) {
+        telegramId = tg.initDataUnsafe.user.id.toString();
+        firstName = tg.initDataUnsafe.user.first_name;
+        username = tg.initDataUnsafe.user.username || 'telegram_user';
+      }
+
       const GROUP_CHAT_ID = '-1003872191165'; // Academy group chat ID
 
-      // Create updated user with telegram details
-      const updatedUser = {
-        ...state.user,
-        id: telegramId,
-        telegram_id: telegramId,
-        first_name: tg.initDataUnsafe.user.first_name,
-        username: tg.initDataUnsafe.user.username || 'telegram_user',
-      };
-
-      // Set user immediately
-      dispatch({ type: 'SET_USER', payload: updatedUser });
-
       try {
-        const response = await fetch('/api/check-admin', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            telegramId,
-            groupId: GROUP_CHAT_ID,
-            initData: tg.initData,
-          }),
+        // 1. Fetch check-admin status first
+        let isAdmin = false;
+        if (tg?.initData) {
+          try {
+            const response = await fetch('/api/check-admin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                telegramId,
+                groupId: GROUP_CHAT_ID,
+                initData: tg.initData,
+              }),
+            });
+            const data = await response.json();
+            isAdmin = data?.isAdmin || false;
+          } catch (err) {
+            console.error('Admin verification check failed:', err);
+          }
+        }
+
+        // 2. Fetch or create user in Supabase users table
+        let dbUser = null;
+        const { data: existingUsers, error: fetchErr } = await supabase
+          .from('users')
+          .select('*')
+          .eq('telegram_id', telegramId);
+
+        if (fetchErr) throw fetchErr;
+
+        if (existingUsers && existingUsers.length > 0) {
+          dbUser = existingUsers[0];
+          // Update admin status if it has changed
+          if (dbUser.is_admin !== isAdmin) {
+            const { data: updated } = await supabase
+              .from('users')
+              .update({ is_admin: isAdmin })
+              .eq('id', dbUser.id)
+              .select();
+            if (updated && updated.length > 0) {
+              dbUser = updated[0];
+            }
+          }
+        } else {
+          // Create new user record
+          const { data: inserted, error: insertErr } = await supabase
+            .from('users')
+            .insert({
+              telegram_id: telegramId,
+              first_name: firstName,
+              username: username,
+              level: 1,
+              xp: 0,
+              streak: 1,
+              is_admin: isAdmin,
+              last_login: new Date().toISOString(),
+            })
+            .select();
+
+          if (insertErr) throw insertErr;
+          if (inserted && inserted.length > 0) {
+            dbUser = inserted[0];
+          }
+        }
+
+        if (!dbUser) throw new Error('Failed to resolve user from database');
+
+        // 3. Fetch relational progress data from Supabase
+        const [progressRes, achievementsRes, rewardsRes] = await Promise.all([
+          supabase.from('lesson_progress').select('*').eq('user_id', dbUser.id),
+          supabase.from('user_achievements').select('*').eq('user_id', dbUser.id),
+          supabase.from('daily_rewards').select('*').eq('user_id', dbUser.id)
+        ]);
+
+        const lessonProgress = progressRes.data || [];
+        const userAchievements = achievementsRes.data || [];
+        const dailyRewards = rewardsRes.data || [];
+
+        // 4. Update local tracking refs to prevent re-writes on load
+        lessonProgress.forEach(p => persistedProgressIds.current.add(p.id));
+        userAchievements.forEach(a => persistedAchievementIds.current.add(a.id));
+        dailyRewards.forEach(r => persistedRewardIds.current.add(r.id));
+        lastSavedUser.current = {
+          xp: dbUser.xp,
+          level: dbUser.level,
+          streak: dbUser.streak,
+          is_admin: dbUser.is_admin,
+          last_login: dbUser.last_login
+        };
+
+        // 5. Load state to context
+        dispatch({
+          type: 'LOAD_STATE',
+          payload: {
+            user: {
+              id: dbUser.id,
+              telegram_id: dbUser.telegram_id,
+              first_name: dbUser.first_name,
+              username: dbUser.username,
+              avatar: dbUser.avatar || '',
+              level: dbUser.level,
+              xp: dbUser.xp,
+              streak: dbUser.streak,
+              last_login: dbUser.last_login,
+              created_at: dbUser.created_at,
+              is_admin: dbUser.is_admin,
+              is_banned: dbUser.is_banned
+            },
+            lessonProgress: lessonProgress.map(p => ({
+              id: p.id,
+              user_id: p.user_id,
+              lesson_id: p.lesson_id,
+              status: p.status,
+              completed_at: p.completed_at
+            })),
+            userAchievements: userAchievements.map(a => ({
+              id: a.id,
+              user_id: a.user_id,
+              achievement_id: a.achievement_id,
+              earned_at: a.earned_at
+            })),
+            dailyRewards: dailyRewards.map(r => ({
+              id: r.id,
+              user_id: r.user_id,
+              day: r.day,
+              xp_reward: r.xp_reward,
+              claimed_at: r.claimed_at
+            }))
+          }
         });
 
-        const data = await response.json();
-        if (data && typeof data.isAdmin === 'boolean') {
-          dispatch({
-            type: 'SET_USER',
-            payload: {
-              ...updatedUser,
-              is_admin: data.isAdmin,
-            },
-          });
-        }
+        // Trigger streak update on mount locally as well
+        dispatch({ type: 'UPDATE_STREAK' });
+
+        isLoadedRef.current = true;
       } catch (err) {
-        console.error('Admin verification check failed:', err);
+        console.error('Supabase synchronization bootstrap failed:', err);
+        // Fallback: update local streak and let user play locally
+        dispatch({ type: 'UPDATE_STREAK' });
+        isLoadedRef.current = true;
       }
     };
 
-    checkAdminStatus();
+    bootstrapUser();
   }, []);
+
+  // Sync changes back to Supabase in the background
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+
+    const syncToDatabase = async () => {
+      // 1. Sync new lesson progress
+      const newProgress = state.lessonProgress.filter((p: LessonProgress) => !persistedProgressIds.current.has(p.id));
+      for (const progress of newProgress) {
+        try {
+          const { error } = await supabase.from('lesson_progress').insert({
+            id: progress.id,
+            user_id: state.user.id,
+            lesson_id: progress.lesson_id,
+            status: progress.status,
+            completed_at: progress.completed_at
+          });
+          if (!error) persistedProgressIds.current.add(progress.id);
+        } catch (err) {
+          console.error('Failed to sync lesson progress:', err);
+        }
+      }
+
+      // 2. Sync new achievements
+      const newAchievements = state.userAchievements.filter((a: UserAchievement) => !persistedAchievementIds.current.has(a.id));
+      for (const ach of newAchievements) {
+        try {
+          const { error } = await supabase.from('user_achievements').insert({
+            id: ach.id,
+            user_id: state.user.id,
+            achievement_id: ach.achievement_id,
+            earned_at: ach.earned_at
+          });
+          if (!error) persistedAchievementIds.current.add(ach.id);
+        } catch (err) {
+          console.error('Failed to sync user achievement:', err);
+        }
+      }
+
+      // 3. Sync new daily rewards
+      const newRewards = state.dailyRewards.filter((r: DailyReward) => !persistedRewardIds.current.has(r.id));
+      for (const reward of newRewards) {
+        try {
+          const { error } = await supabase.from('daily_rewards').insert({
+            id: reward.id,
+            user_id: state.user.id,
+            day: reward.day,
+            xp_reward: reward.xp_reward,
+            claimed_at: reward.claimed_at
+          });
+          if (!error) persistedRewardIds.current.add(reward.id);
+        } catch (err) {
+          console.error('Failed to sync daily reward:', err);
+        }
+      }
+
+      // 4. Sync user profile changes (XP, Level, Streak)
+      const u = state.user;
+      const last = lastSavedUser.current;
+      if (last && (u.xp !== last.xp || u.level !== last.level || u.streak !== last.streak || u.last_login !== last.last_login)) {
+        try {
+          const { error } = await supabase
+            .from('users')
+            .update({
+              xp: u.xp,
+              level: u.level,
+              streak: u.streak,
+              last_login: u.last_login
+            })
+            .eq('id', u.id);
+          if (!error) {
+            lastSavedUser.current = {
+              xp: u.xp,
+              level: u.level,
+              streak: u.streak,
+              is_admin: u.is_admin,
+              last_login: u.last_login
+            };
+          }
+        } catch (err) {
+          console.error('Failed to sync user profile:', err);
+        }
+      }
+    };
+
+    syncToDatabase();
+  }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards]);
 
   // Helpers
   const getModuleProgress = (moduleId: string): number => {
