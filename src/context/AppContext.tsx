@@ -289,7 +289,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 // ===== Provider =====
-const STORAGE_KEY = 'academy_hub_state';
+const STORAGE_KEY = 'academy_hub_state_v3';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState, (initial) => {

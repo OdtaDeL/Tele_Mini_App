@@ -6,12 +6,12 @@ export const MOCK_USER: User = {
   username: 'trader_alex',
   first_name: 'Alex',
   avatar: '',
-  level: 3,
-  xp: 320,
-  streak: 5,
+  level: 1,
+  xp: 0,
+  streak: 1,
   last_login: new Date().toISOString(),
-  created_at: '2025-01-15T10:00:00Z',
-  is_admin: true,
+  created_at: new Date().toISOString(),
+  is_admin: false,
   is_banned: false,
 };
 

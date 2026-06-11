@@ -14,6 +14,7 @@ import ModuleManager from './pages/admin/ModuleManager';
 import LessonManager from './pages/admin/LessonManager';
 import UserManager from './pages/admin/UserManager';
 import LeaderboardManager from './pages/admin/LeaderboardManager';
+import NotificationToast from './components/NotificationToast';
 
 export default function App() {
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function App() {
     <AppProvider>
       <BrowserRouter>
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+          <NotificationToast />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/learn" element={<LearnPage />} />
