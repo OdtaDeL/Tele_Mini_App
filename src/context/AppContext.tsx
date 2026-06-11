@@ -679,6 +679,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     syncToDatabase();
   }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards, state.leaderboardUsers]);
 
+  // Check achievements automatically when state changes (prevents React closure/timeout bugs)
+  useEffect(() => {
+    if (isLoadedRef.current) {
+      checkAndGrantAchievements();
+    }
+  }, [state.user.xp, state.lessonProgress, state.userAchievements]);
+
   // Helpers
   const getModuleProgress = (moduleId: string): number => {
     const moduleLessons = state.lessons.filter((l: Lesson) => l.module_id === moduleId);

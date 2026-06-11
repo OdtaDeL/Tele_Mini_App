@@ -80,7 +80,7 @@ export default function RewardsPage() {
         }}>
           {DAILY_REWARD_XP.slice(0, 4).map((xp, idx) => {
             const day = idx + 1;
-            const isClaimed = day <= currentDay || (day === currentDay + 1 && claimed);
+            const isClaimed = day <= currentDay;
             const isClaimable = day === currentDay + 1 && !claimed;
 
             return (
@@ -103,7 +103,7 @@ export default function RewardsPage() {
         }}>
           {DAILY_REWARD_XP.slice(4).map((xp, idx) => {
             const day = idx + 5;
-            const isClaimed = day <= currentDay || (day === currentDay + 1 && claimed);
+            const isClaimed = day <= currentDay;
             const isClaimable = day === currentDay + 1 && !claimed;
 
             return (
