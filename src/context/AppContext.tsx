@@ -288,12 +288,21 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 // ===== Provider =====
-const STORAGE_KEY = 'academy_hub_state_v3';
+// Helper to get active storage key based on Telegram user ID
+const getStorageKey = (): string => {
+  const tg = window.Telegram?.WebApp;
+  const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
+  return tgUserId ? `academy_hub_state_tg_${tgUserId}` : 'academy_hub_state_v3';
+};
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState, (initial) => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const tg = window.Telegram?.WebApp;
+      const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
+      const actualKey = tgUserId ? `academy_hub_state_tg_${tgUserId}` : 'academy_hub_state_v3';
+      
+      const saved = localStorage.getItem(actualKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
@@ -305,6 +314,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           modules: parsed.modules || initial.modules,
           lessons: parsed.lessons || initial.lessons,
         };
+      } else if (tgUserId) {
+        // Initialize new Telegram user session
+        return {
+          ...initial,
+          user: {
+            ...initial.user,
+            id: tgUserId,
+            telegram_id: tgUserId,
+            first_name: tg?.initDataUnsafe?.user?.first_name || 'Trader',
+            username: tg?.initDataUnsafe?.user?.username || 'telegram_user',
+          }
+        };
       }
     } catch {
       // ignore
@@ -314,6 +335,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Persist to localStorage
   useEffect(() => {
+    const actualKey = getStorageKey();
     const toSave = {
       user: state.user,
       lessonProgress: state.lessonProgress,
@@ -322,7 +344,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       modules: state.modules,
       lessons: state.lessons,
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    localStorage.setItem(actualKey, JSON.stringify(toSave));
   }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards, state.modules, state.lessons]);
 
   // Update streak on mount
@@ -342,6 +364,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Create updated user with telegram details
       const updatedUser = {
         ...state.user,
+        id: telegramId,
         telegram_id: telegramId,
         first_name: tg.initDataUnsafe.user.first_name,
         username: tg.initDataUnsafe.user.username || 'telegram_user',

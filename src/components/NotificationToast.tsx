@@ -13,7 +13,7 @@ export default function NotificationToast() {
       const latest = achievementNotifications[achievementNotifications.length - 1];
       const timer = setTimeout(() => {
         dispatch({ type: 'DISMISS_NOTIFICATION', payload: latest.id });
-      }, 8000); // Auto dismiss after 5 seconds
+      }, 8000); // Auto dismiss after 8 seconds
       return () => clearTimeout(timer);
     }
   }, [achievementNotifications, dispatch]);
