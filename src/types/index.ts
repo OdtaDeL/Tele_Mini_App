@@ -43,36 +43,6 @@ export interface LessonProgress {
   completed_at?: string;
 }
 
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  xp_reward: number;
-  condition_type: 'lessons_completed' | 'streak_days' | 'modules_completed' | 'xp_earned';
-  condition_value: number;
-}
-
-export interface UserAchievement {
-  id: string;
-  user_id: string;
-  achievement_id: string;
-  earned_at: string;
-}
-
-export interface DailyReward {
-  id: string;
-  user_id: string;
-  day: number;
-  xp_reward: number;
-  claimed_at: string;
-}
-
-export interface LeaderboardEntry {
-  rank: number;
-  user: User;
-}
-
 export interface LevelThreshold {
   level: number;
   xp_required: number;
@@ -81,7 +51,7 @@ export interface LevelThreshold {
 
 export interface AppNotification {
   id: string;
-  type: 'xp_gain' | 'level_up' | 'achievement' | 'reward';
+  type: 'xp_gain' | 'level_up';
   message: string;
   value?: number;
   timestamp: number;

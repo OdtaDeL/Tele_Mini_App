@@ -1,4 +1,4 @@
-import type { Module, Lesson, Achievement, User } from '../types';
+import type { Module, Lesson, User } from '../types';
 
 export const MOCK_USER: User = {
   id: 'user_001',
@@ -89,80 +89,6 @@ This is the content for Lesson 4. You can edit this text later.
   },
 ];
 
-export const MOCK_ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'ach_001',
-    name: 'First Steps',
-    description: 'Complete your first lesson',
-    icon: '🎯',
-    xp_reward: 50,
-    condition_type: 'lessons_completed',
-    condition_value: 1,
-  },
-  {
-    id: 'ach_002',
-    name: 'Knowledge Seeker',
-    description: 'Complete all 4 lessons',
-    icon: '📖',
-    xp_reward: 75,
-    condition_type: 'lessons_completed',
-    condition_value: 4,
-  },
-  {
-    id: 'ach_003',
-    name: 'Dedicated Student',
-    description: 'Maintain a 7-day streak',
-    icon: '🔥',
-    xp_reward: 100,
-    condition_type: 'streak_days',
-    condition_value: 7,
-  },
-  {
-    id: 'ach_004',
-    name: 'Module Master',
-    description: 'Complete an entire module',
-    icon: '🏅',
-    xp_reward: 100,
-    condition_type: 'modules_completed',
-    condition_value: 1,
-  },
-  {
-    id: 'ach_005',
-    name: 'Scholar',
-    description: 'Earn 500 XP',
-    icon: '🎓',
-    xp_reward: 75,
-    condition_type: 'xp_earned',
-    condition_value: 500,
-  },
-  {
-    id: 'ach_006',
-    name: 'Academy Elite',
-    description: 'Complete all 4 lessons',
-    icon: '⭐',
-    xp_reward: 150,
-    condition_type: 'lessons_completed',
-    condition_value: 4,
-  },
-  {
-    id: 'ach_007',
-    name: 'Unstoppable',
-    description: 'Maintain a 14-day streak',
-    icon: '💎',
-    xp_reward: 200,
-    condition_type: 'streak_days',
-    condition_value: 14,
-  },
-  {
-    id: 'ach_008',
-    name: 'Academy Legend',
-    description: 'Complete all modules',
-    icon: '👑',
-    xp_reward: 500,
-    condition_type: 'modules_completed',
-    condition_value: 1,
-  },
-];
 
 export const MOCK_LEADERBOARD_USERS: User[] = [
   { id: 'lb_001', telegram_id: '111', username: 'crypto_king', first_name: 'Marcus', avatar: '', level: 8, xp: 4200, streak: 21, last_login: new Date().toISOString(), created_at: '2025-01-01', is_admin: false, is_banned: false },

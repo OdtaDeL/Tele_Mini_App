@@ -40,10 +40,7 @@ export default function AdminDashboard() {
             <span style={{ color: 'var(--color-text-muted)' }}>Total Lessons</span>
             <span style={{ fontWeight: 600 }}>{state.lessons.length}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: 'var(--color-text-muted)' }}>Achievements Available</span>
-            <span style={{ fontWeight: 600 }}>{state.achievements.length}</span>
-          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
             <span style={{ color: 'var(--color-text-muted)' }}>Banned Users</span>
             <span style={{ fontWeight: 600, color: 'var(--color-danger)' }}>

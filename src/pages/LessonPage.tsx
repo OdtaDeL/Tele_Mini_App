@@ -8,7 +8,7 @@ import LevelUpModal from '../components/LevelUpModal';
 export default function LessonPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { state, dispatch, getLessonStatus, checkAndGrantAchievements } = useApp();
+  const { state, dispatch, getLessonStatus } = useApp();
 
   const lesson = state.lessons.find(l => l.id === id);
   const module = lesson ? state.modules.find(m => m.id === lesson.module_id) : null;
@@ -55,12 +55,7 @@ export default function LessonPage() {
         setShowLevelUp(true);
       }, 1600);
     }
-
-    // Check achievements
-    setTimeout(() => {
-      checkAndGrantAchievements();
-    }, 500);
-  }, [lesson, status, completing, state.user.level, state.user.xp, dispatch, checkAndGrantAchievements]);
+  }, [lesson, status, completing, state.user.level, state.user.xp, dispatch]);
 
   useEffect(() => {
     // Mark as in_progress when viewing

@@ -14,8 +14,6 @@ export default function HomePage() {
 
   const quickActions = [
     { label: 'Learn', icon: '📚', path: '/learn', color: '#6c5ce7' },
-    { label: 'Rewards', icon: '🎁', path: '/rewards', color: '#00cec9' },
-    { label: 'Ranking', icon: '🏆', path: '/leaderboard', color: '#ffd700' },
     { label: 'Profile', icon: '👤', path: '/profile', color: '#fd7014' },
   ];
 

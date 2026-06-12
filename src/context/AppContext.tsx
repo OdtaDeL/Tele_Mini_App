@@ -1,7 +1,7 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
-import type { User, Module, Lesson, LessonProgress, Achievement, UserAchievement, DailyReward, AppNotification } from '../types';
-import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS, MOCK_ACHIEVEMENTS, MOCK_LEADERBOARD_USERS } from '../data/mockData';
-import { getLevelFromXP, generateId, isToday, isYesterday, DAILY_REWARD_XP, XP_REWARDS } from '../utils/helpers';
+import type { User, Module, Lesson, LessonProgress, AppNotification } from '../types';
+import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS, MOCK_LEADERBOARD_USERS } from '../data/mockData';
+import { getLevelFromXP, generateId, isToday, isYesterday, XP_REWARDS } from '../utils/helpers';
 import { supabase } from '../services/supabase';
 
 // ===== State Shape =====
@@ -10,9 +10,6 @@ interface AppState {
   modules: Module[];
   lessons: Lesson[];
   lessonProgress: LessonProgress[];
-  achievements: Achievement[];
-  userAchievements: UserAchievement[];
-  dailyRewards: DailyReward[];
   leaderboardUsers: User[];
   notifications: AppNotification[];
   isLoading: boolean;
@@ -25,8 +22,6 @@ type AppAction =
   | { type: 'SET_USER'; payload: User }
   | { type: 'ADD_XP'; payload: number }
   | { type: 'COMPLETE_LESSON'; payload: { lessonId: string; xpReward: number } }
-  | { type: 'CLAIM_DAILY_REWARD' }
-  | { type: 'EARN_ACHIEVEMENT'; payload: string }
   | { type: 'ADD_NOTIFICATION'; payload: AppNotification }
   | { type: 'DISMISS_NOTIFICATION'; payload: string }
   | { type: 'UPDATE_STREAK' }
@@ -39,8 +34,7 @@ type AppAction =
   | { type: 'ADMIN_UPDATE_LESSON'; payload: Lesson }
   | { type: 'ADMIN_DELETE_LESSON'; payload: string }
   | { type: 'ADMIN_GRANT_XP'; payload: { userId: string; amount: number } }
-  | { type: 'ADMIN_BAN_USER'; payload: string }
-  | { type: 'ADMIN_RESET_LEADERBOARD'; payload: 'weekly' | 'monthly' };
+  | { type: 'ADMIN_BAN_USER'; payload: string };
 
 // ===== Initial State =====
 const initialState: AppState = {
@@ -48,9 +42,6 @@ const initialState: AppState = {
   modules: MOCK_MODULES,
   lessons: MOCK_LESSONS,
   lessonProgress: [],
-  achievements: MOCK_ACHIEVEMENTS,
-  userAchievements: [],
-  dailyRewards: [],
   leaderboardUsers: MOCK_LEADERBOARD_USERS,
   notifications: [],
   isLoading: false,
@@ -115,69 +106,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
-    case 'CLAIM_DAILY_REWARD': {
-      const todayReward = state.dailyRewards.find(
-        r => isToday(r.claimed_at)
-      );
-      if (todayReward) return state;
-
-      const streakRewards = [...state.dailyRewards]
-        .sort((a, b) => new Date(b.claimed_at).getTime() - new Date(a.claimed_at).getTime());
-
-      let currentDay = 0;
-      if (streakRewards.length > 0) {
-        const lastReward = streakRewards[0];
-        if (isYesterday(lastReward.claimed_at)) {
-          currentDay = (lastReward.day % 7);
-        }
-      }
-      const nextDay = currentDay + 1;
-      const xpReward = DAILY_REWARD_XP[nextDay - 1] || 10;
-
-      const newReward: DailyReward = {
-        id: generateId(),
-        user_id: state.user.id,
-        day: nextDay,
-        xp_reward: xpReward,
-        claimed_at: new Date().toISOString(),
-      };
-
-      const newXP = state.user.xp + xpReward;
-      const newLevel = getLevelFromXP(newXP);
-
-      return {
-        ...state,
-        dailyRewards: [...state.dailyRewards, newReward],
-        user: { ...state.user, xp: newXP, level: newLevel },
-      };
-    }
-
-    case 'EARN_ACHIEVEMENT': {
-      const achievementId = action.payload;
-      const already = state.userAchievements.find(
-        ua => ua.achievement_id === achievementId && ua.user_id === state.user.id
-      );
-      if (already) return state;
-
-      const achievement = state.achievements.find(a => a.id === achievementId);
-      if (!achievement) return state;
-
-      const newUA: UserAchievement = {
-        id: generateId(),
-        user_id: state.user.id,
-        achievement_id: achievementId,
-        earned_at: new Date().toISOString(),
-      };
-
-      const newXP = state.user.xp + achievement.xp_reward;
-      const newLevel = getLevelFromXP(newXP);
-
-      return {
-        ...state,
-        userAchievements: [...state.userAchievements, newUA],
-        user: { ...state.user, xp: newXP, level: newLevel },
-      };
-    }
 
     case 'ADD_NOTIFICATION':
       return {
@@ -266,9 +194,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ),
       };
 
-    case 'ADMIN_RESET_LEADERBOARD':
-      // In a real app, this would reset weekly/monthly XP tracking
-      return state;
 
     default:
       return state;
@@ -284,10 +209,7 @@ interface AppContextValue {
   getLessonStatus: (lessonId: string) => 'not_started' | 'in_progress' | 'completed';
   getCompletedLessonsCount: () => number;
   getCompletedModulesCount: () => number;
-  hasClaimedToday: () => boolean;
   getCurrentStreak: () => number;
-  getDailyRewardDay: () => number;
-  checkAndGrantAchievements: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -316,8 +238,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...initial,
           user: parsed.user || initial.user,
           lessonProgress: parsed.lessonProgress || [],
-          userAchievements: parsed.userAchievements || [],
-          dailyRewards: parsed.dailyRewards || [],
           modules: parsed.modules || initial.modules,
           lessons: parsed.lessons || initial.lessons,
         };
@@ -346,8 +266,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const isLoadedRef = useRef(false);
   const persistedProgressIds = useRef<Set<string>>(new Set());
-  const persistedRewardIds = useRef<Set<string>>(new Set());
-  const persistedAchievementIds = useRef<Set<string>>(new Set());
   const lastSavedUser = useRef<{ xp: number; level: number; streak: number; is_admin: boolean; last_login: string } | null>(null);
   const lastSavedLeaderboardUsers = useRef<User[] | null>(null);
 
@@ -357,13 +275,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const toSave = {
       user: state.user,
       lessonProgress: state.lessonProgress,
-      userAchievements: state.userAchievements,
-      dailyRewards: state.dailyRewards,
       modules: state.modules,
       lessons: state.lessons,
     };
     localStorage.setItem(actualKey, JSON.stringify(toSave));
-  }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards, state.modules, state.lessons]);
+  }, [state.user, state.lessonProgress, state.modules, state.lessons]);
 
   // Sync Telegram user, bootstrap Supabase data and verify Admin role
   useEffect(() => {
@@ -464,16 +380,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!dbUser) throw new Error('Failed to resolve user from database');
 
         // 3. Fetch relational progress data and all users from Supabase
-        const [progressRes, achievementsRes, rewardsRes, usersRes] = await Promise.all([
+        const [progressRes, usersRes] = await Promise.all([
           supabase.from('lesson_progress').select('*').eq('user_id', dbUser.id),
-          supabase.from('user_achievements').select('*').eq('user_id', dbUser.id),
-          supabase.from('daily_rewards').select('*').eq('user_id', dbUser.id),
           supabase.from('users').select('*')
         ]);
 
         const lessonProgress = progressRes.data || [];
-        const userAchievements = achievementsRes.data || [];
-        const dailyRewards = rewardsRes.data || [];
         const allUsers = usersRes.data || [];
 
         // Filter out current user from leaderboardUsers to avoid duplicate rendering
@@ -494,8 +406,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         // 4. Update local tracking refs to prevent re-writes on load
         lessonProgress.forEach(p => persistedProgressIds.current.add(p.id));
-        userAchievements.forEach(a => persistedAchievementIds.current.add(a.id));
-        dailyRewards.forEach(r => persistedRewardIds.current.add(r.id));
         lastSavedUser.current = {
           xp: dbUser.xp,
           level: dbUser.level,
@@ -532,19 +442,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
               lesson_id: p.lesson_id,
               status: p.status,
               completed_at: p.completed_at
-            })),
-            userAchievements: userAchievements.map(a => ({
-              id: a.id,
-              user_id: a.user_id,
-              achievement_id: a.achievement_id,
-              earned_at: a.earned_at
-            })),
-            dailyRewards: dailyRewards.map(r => ({
-              id: r.id,
-              user_id: r.user_id,
-              day: r.day,
-              xp_reward: r.xp_reward,
-              claimed_at: r.claimed_at
             }))
           }
         });
@@ -592,38 +489,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // 2. Sync new achievements
-      const newAchievements = state.userAchievements.filter((a: UserAchievement) => !persistedAchievementIds.current.has(a.id));
-      for (const ach of newAchievements) {
-        try {
-          const { error } = await supabase.from('user_achievements').insert({
-            id: ach.id,
-            user_id: state.user.id,
-            achievement_id: ach.achievement_id,
-            earned_at: ach.earned_at
-          });
-          if (!error) persistedAchievementIds.current.add(ach.id);
-        } catch (err) {
-          console.error('Failed to sync user achievement:', err);
-        }
-      }
-
-      // 3. Sync new daily rewards
-      const newRewards = state.dailyRewards.filter((r: DailyReward) => !persistedRewardIds.current.has(r.id));
-      for (const reward of newRewards) {
-        try {
-          const { error } = await supabase.from('daily_rewards').insert({
-            id: reward.id,
-            user_id: state.user.id,
-            day: reward.day,
-            xp_reward: reward.xp_reward,
-            claimed_at: reward.claimed_at
-          });
-          if (!error) persistedRewardIds.current.add(reward.id);
-        } catch (err) {
-          console.error('Failed to sync daily reward:', err);
-        }
-      }
 
       // 4. Sync user profile changes (XP, Level, Streak)
       const u = state.user;
@@ -677,14 +542,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     syncToDatabase();
-  }, [state.user, state.lessonProgress, state.userAchievements, state.dailyRewards, state.leaderboardUsers]);
-
-  // Check achievements automatically when state changes (prevents React closure/timeout bugs)
-  useEffect(() => {
-    if (isLoadedRef.current) {
-      checkAndGrantAchievements();
-    }
-  }, [state.user.xp, state.lessonProgress, state.userAchievements]);
+  }, [state.user, state.lessonProgress, state.leaderboardUsers]);
 
   // Helpers
   const getModuleProgress = (moduleId: string): number => {
@@ -717,70 +575,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return count;
   };
 
-  const hasClaimedToday = (): boolean => {
-    return state.dailyRewards.some(
-      (r: DailyReward) => isToday(r.claimed_at)
-    );
-  };
-
   const getCurrentStreak = (): number => {
     return state.user.streak;
-  };
-
-  const getDailyRewardDay = (): number => {
-    const rewards = [...state.dailyRewards]
-      .sort((a: DailyReward, b: DailyReward) => new Date(b.claimed_at).getTime() - new Date(a.claimed_at).getTime());
-
-    if (rewards.length === 0) return 0;
-    const last = rewards[0];
-    if (isToday(last.claimed_at) || isYesterday(last.claimed_at)) {
-      return last.day;
-    }
-    return 0;
-  };
-
-  const checkAndGrantAchievements = () => {
-    const completedLessons = getCompletedLessonsCount();
-    const completedModules = getCompletedModulesCount();
-    const streak = getCurrentStreak();
-    const xp = state.user.xp;
-
-    for (const achievement of state.achievements) {
-      const alreadyEarned = state.userAchievements.some(
-        (ua: UserAchievement) => ua.achievement_id === achievement.id && ua.user_id === state.user.id
-      );
-      if (alreadyEarned) continue;
-
-      let earned = false;
-      switch (achievement.condition_type) {
-        case 'lessons_completed':
-          earned = completedLessons >= achievement.condition_value;
-          break;
-        case 'modules_completed':
-          earned = completedModules >= achievement.condition_value;
-          break;
-        case 'streak_days':
-          earned = streak >= achievement.condition_value;
-          break;
-        case 'xp_earned':
-          earned = xp >= achievement.condition_value;
-          break;
-      }
-
-      if (earned) {
-        dispatch({ type: 'EARN_ACHIEVEMENT', payload: achievement.id });
-        dispatch({
-          type: 'ADD_NOTIFICATION',
-          payload: {
-            id: generateId(),
-            type: 'achievement',
-            message: `Achievement unlocked: ${achievement.name}!`,
-            value: achievement.xp_reward,
-            timestamp: Date.now(),
-          },
-        });
-      }
-    }
   };
 
   const value: AppContextValue = {
@@ -790,10 +586,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     getLessonStatus,
     getCompletedLessonsCount,
     getCompletedModulesCount,
-    hasClaimedToday,
     getCurrentStreak,
-    getDailyRewardDay,
-    checkAndGrantAchievements,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

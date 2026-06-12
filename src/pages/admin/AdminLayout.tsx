@@ -5,7 +5,6 @@ const adminTabs = [
   { path: '/admin/modules', label: 'Modules', icon: '📚' },
   { path: '/admin/lessons', label: 'Lessons', icon: '📖' },
   { path: '/admin/users', label: 'Users', icon: '👥' },
-  { path: '/admin/leaderboard', label: 'Rankings', icon: '🏆' },
 ];
 
 export default function AdminLayout() {

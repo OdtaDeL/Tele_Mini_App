@@ -11,7 +11,6 @@ export default function ProfilePage() {
 
   const completedLessons = getCompletedLessonsCount();
   const completedModules = getCompletedModulesCount();
-  const earnedAchievements = state.userAchievements.filter(ua => ua.user_id === user.id).length;
 
   const stats = [
     { label: 'Level', value: user.level, icon: '⚡', color: '#00cec9' },
@@ -19,7 +18,6 @@ export default function ProfilePage() {
     { label: 'Streak', value: `${user.streak}d`, icon: '🔥', color: '#fd7014' },
     { label: 'Lessons', value: completedLessons, icon: '📖', color: '#00b894' },
     { label: 'Modules', value: completedModules, icon: '📚', color: '#ffd700' },
-    { label: 'Awards', value: earnedAchievements, icon: '🏅', color: '#ff6b6b' },
   ];
 
   return (
@@ -144,42 +142,6 @@ export default function ProfilePage() {
               <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{item.value}</span>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Achievement Badges */}
-      <div className="animate-fadeInUp delay-300" style={{ marginTop: '20px' }}>
-        <h3 style={{ fontSize: '0.95rem', fontWeight: 600, marginBottom: '12px' }}>
-          Badges ({earnedAchievements}/{state.achievements.length})
-        </h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-          {state.achievements.map((ach) => {
-            const earned = state.userAchievements.some(
-              ua => ua.achievement_id === ach.id && ua.user_id === user.id
-            );
-            return (
-              <div
-                key={ach.id}
-                style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.5rem',
-                  background: earned ? 'rgba(108, 92, 231, 0.15)' : 'var(--color-bg-elevated)',
-                  border: earned ? '1px solid rgba(108, 92, 231, 0.3)' : '1px solid var(--color-border)',
-                  opacity: earned ? 1 : 0.3,
-                  filter: earned ? 'none' : 'grayscale(1)',
-                  transition: 'all 0.3s ease',
-                }}
-                title={ach.name}
-              >
-                {ach.icon}
-              </div>
-            );
-          })}
         </div>
       </div>
 
