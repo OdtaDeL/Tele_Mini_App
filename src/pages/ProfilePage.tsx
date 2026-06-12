@@ -16,8 +16,8 @@ export default function ProfilePage() {
     <div className="page page-top">
 
       {/* ── Identity ── */}
-      <div className="a-fadeUp" style={{ marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div className="a-fadeUp" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: user.is_admin ? 14 : 0 }}>
           <div style={{
             width: 56, height: 56, borderRadius: 16, flexShrink: 0,
             background: 'var(--gold)',
@@ -34,17 +34,49 @@ export default function ProfilePage() {
               @{user.username}
             </p>
           </div>
-          {user.is_admin && (
-            <span style={{
-              fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px',
-              background: 'rgba(201,162,39,0.1)', color: 'var(--gold-bright)',
-              borderRadius: 99, border: '1px solid rgba(201,162,39,0.2)',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-            }}>
-              Admin
-            </span>
-          )}
         </div>
+
+        {/* Admin Mode button — directly under user info */}
+        {user.is_admin && (
+          <button
+            id="admin-mode-btn"
+            onClick={() => navigate('/admin')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '13px 16px',
+              background: 'linear-gradient(135deg, rgba(201,162,39,0.12), rgba(201,162,39,0.06))',
+              border: '1px solid rgba(201,162,39,0.35)',
+              borderRadius: 'var(--radius-md)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              fontFamily: 'var(--font-sans)',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(201,162,39,0.18)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(201,162,39,0.12), rgba(201,162,39,0.06))'; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: 8,
+                background: 'rgba(201,162,39,0.15)',
+                border: '1px solid rgba(201,162,39,0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.85rem',
+              }}>⚙</div>
+              <div style={{ textAlign: 'left' }}>
+                <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--gold-bright)', lineHeight: 1.2 }}>
+                  Admin Mode
+                </p>
+                <p style={{ fontSize: '0.68rem', color: 'var(--text-3)', marginTop: 1 }}>
+                  Manage lessons, modules & users
+                </p>
+              </div>
+            </div>
+            <span style={{ color: 'var(--gold)', fontSize: '1rem', opacity: 0.7 }}>›</span>
+          </button>
+        )}
       </div>
 
       {/* ── Progress summary ── */}
@@ -141,19 +173,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Admin button */}
-      {user.is_admin && (
-        <div className="a-fadeUp d-4">
-          <button
-            className="btn btn-ghost btn-lg"
-            id="admin-panel-btn"
-            onClick={() => navigate('/admin')}
-            style={{ width: '100%' }}
-          >
-            Admin Panel
-          </button>
-        </div>
-      )}
     </div>
   );
 }
