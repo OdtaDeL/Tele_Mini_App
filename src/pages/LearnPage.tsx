@@ -5,56 +5,43 @@ import Skeleton from '../components/ui/Skeleton';
 
 export default function LearnPage() {
   const navigate = useNavigate();
-  const { 
-    state, 
-    getModuleProgress, 
-    getLessonStatus, 
-    getCompletedLessonsCount, 
-    getCompletedModulesCount 
-  } = useApp();
-
+  const { state, getModuleProgress, getLessonStatus } = useApp();
+  
   const sortedModules = [...state.modules].sort((a, b) => a.order - b.order);
   const [expanded, setExpanded] = useState<string | null>(sortedModules[0]?.id || null);
 
-  const completedLessons = getCompletedLessonsCount();
-  const totalLessons = state.lessons.length;
-  const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-  const completedModules = getCompletedModulesCount();
-
   if (state.isLoading) {
     return (
-      <div className="page page-top pb-28">
-        {/* ── Curriculum Header Skeleton ── */}
-        <div className="mb-8">
-          <Skeleton width="70px" height="10px" style={{ marginBottom: 8 }} />
-          <Skeleton width="180px" height="28px" style={{ marginBottom: 8 }} />
-          <Skeleton width="240px" height="14px" />
+      <div className="page page-top">
+        {/* Header Skeleton */}
+        <div style={{ marginBottom: 24 }}>
+          <Skeleton width="80px" height="12px" style={{ marginBottom: 8 }} />
+          <Skeleton width="180px" height="24px" />
         </div>
 
-        {/* ── Stark Progress Dashboard Skeleton ── */}
-        <div className="mb-10">
-          <div className="flex justify-between items-baseline mb-2">
-            <Skeleton width="90px" height="10px" />
-            <Skeleton width="30px" height="10px" />
-          </div>
-          <Skeleton width="100%" height="2px" borderRadius="0px" style={{ marginBottom: 8 }} />
-          <div className="flex justify-between">
-            <Skeleton width="80px" height="10px" />
-            <Skeleton width="60px" height="10px" />
-          </div>
-        </div>
-
-        {/* ── Flat List-Based Course Directory Skeleton ── */}
-        <div className="flex flex-col divide-y divide-border-subtle/40 border-t border-b border-border-subtle/40">
+        {/* Module list Skeleton */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[1, 2, 3].map((n) => (
-            <div key={n} className="py-5 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Skeleton width="20px" height="14px" />
-                <Skeleton width="60%" height="14px" />
-              </div>
-              <div className="flex items-center gap-4 flex-shrink-0">
-                <Skeleton width="30px" height="12px" />
-                <Skeleton width="10px" height="14px" />
+            <div 
+              key={n} 
+              style={{ 
+                background: 'var(--bg-elevated)', 
+                border: '1px solid var(--border-mid)', 
+                borderRadius: 14, 
+                padding: '14px 16px' 
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Skeleton width="42px" height="42px" borderRadius="10px" />
+                <div style={{ flex: 1 }}>
+                  <Skeleton width="70px" height="10px" style={{ marginBottom: 6 }} />
+                  <Skeleton width="60%" height="14px" style={{ marginBottom: 8 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Skeleton style={{ flex: 1 }} height="4px" />
+                    <Skeleton width="30px" height="10px" />
+                  </div>
+                </div>
+                <Skeleton width="10px" height="18px" />
               </div>
             </div>
           ))}
@@ -64,48 +51,21 @@ export default function LearnPage() {
   }
 
   return (
-    <div className="page page-top pb-28">
-      {/* ── Curriculum Header ── */}
-      <div className="mb-8 a-fadeUp">
-        <p className="font-mono text-[0.65rem] font-bold tracking-[0.2em] uppercase text-text-3 mb-2">
+    <div className="page page-top" style={{ paddingBottom: 112 }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 24 }} className="a-fadeUp">
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 }}>
           Curriculum
         </p>
-        <h1 className="text-3xl font-bold tracking-[-0.04em] leading-tight text-text-1">
+        <h1 style={{ fontSize: '1.55rem', fontWeight: 800, letterSpacing: '-0.035em', color: 'var(--text-1)', lineHeight: 1.2 }}>
           Learning Path
         </h1>
-        <p className="text-sm text-text-2 mt-2 leading-relaxed max-w-[45ch]">
-          Master the curriculum step-by-step. Select a module to view lessons.
-        </p>
       </div>
 
-      {/* ── Stark Progress Dashboard ── */}
-      <div className="mb-10 a-fadeUp d-1">
-        <div className="flex justify-between items-baseline mb-2">
-          <span className="font-mono text-[0.65rem] uppercase tracking-wider text-text-3">
-            Overall Completion
-          </span>
-          <span className="font-mono text-xs font-bold text-accent">
-            {overallProgress}%
-          </span>
-        </div>
-        
-        {/* Thin, flat, non-rounded 2px progress bar */}
-        <div className="w-full h-[2px] bg-border-subtle overflow-hidden">
-          <div 
-            className="h-full bg-accent transition-all duration-700 ease-out"
-            style={{ width: `${overallProgress}%` }}
-          />
-        </div>
-
-        <div className="flex justify-between mt-2 font-mono text-[0.65rem] text-text-3">
-          <span>{completedLessons} / {totalLessons} Lessons Done</span>
-          <span>{completedModules} / {sortedModules.length} Modules</span>
-        </div>
-      </div>
-
-      {/* ── Flat List-Based Course Directory ── */}
-      <div className="flex flex-col divide-y divide-border-subtle/40 border-t border-b border-border-subtle/40 a-fadeUp d-2">
-        {sortedModules.map((mod) => {
+      {/* Module list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {sortedModules.map((mod, idx) => {
           const progress = getModuleProgress(mod.id);
           const isOpen = expanded === mod.id;
           const complete = progress === 100;
@@ -115,76 +75,144 @@ export default function LearnPage() {
           const doneCount = lessons.filter(l => getLessonStatus(l.id) === 'completed').length;
 
           return (
-            <div key={mod.id} className="overflow-hidden">
-              {/* Module Header Row */}
-              <button
+            <div
+              key={mod.id}
+              className="a-fadeUp"
+              style={{ animationDelay: `${idx * 50}ms` }}
+            >
+              {/* Module header */}
+              <div
                 onClick={() => setExpanded(isOpen ? null : mod.id)}
-                className="w-full py-5 text-left transition-all active:scale-[0.99] flex items-center justify-between group gap-4"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: `1px solid ${isOpen ? 'var(--border-gold)' : 'var(--border-mid)'}`,
+                  borderRadius: isOpen ? '14px 14px 0 0' : 14,
+                  padding: '14px 16px',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s, background 0.2s',
+                  borderBottom: isOpen ? '1px solid var(--border)' : undefined,
+                }}
+                onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-elevated)'; }}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  {/* Monospaced Index */}
-                  <span className="font-mono text-xs font-bold text-accent min-w-[20px]">
-                    {String(mod.order).padStart(2, '0')}
-                  </span>
-                  {/* Title */}
-                  <span className="text-sm font-bold text-text-1 group-hover:text-accent transition-colors truncate">
-                    {mod.title}
-                  </span>
-                  {/* Stark Completion Tag */}
-                  {complete && (
-                    <span className="font-mono text-[0.55rem] text-accent tracking-widest border border-accent/20 bg-accent/5 px-1 py-0.5 rounded-sm uppercase select-none">
-                      DONE
-                    </span>
-                  )}
-                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {/* Module icon box */}
+                  <div style={{
+                    width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+                    background: complete ? 'rgba(34,197,94,0.08)' : 'var(--bg-overlay)',
+                    border: `1px solid ${complete ? 'rgba(34,197,94,0.2)' : 'var(--border)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '1.25rem',
+                  }}>
+                    {mod.icon}
+                  </div>
 
-                <div className="flex items-center gap-4 flex-shrink-0">
-                  {/* Progress Fraction */}
-                  <span className="font-mono text-xs text-text-3">
-                    {doneCount}/{lessons.length}
-                  </span>
-                  {/* Typographic Toggle Control */}
-                  <span className="font-mono text-sm text-text-2 group-hover:text-accent select-none w-4 text-center">
-                    {isOpen ? '−' : '+'}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        Module {mod.order}
+                      </span>
+                      {complete && (
+                        <span style={{
+                          fontSize: '0.6rem', fontWeight: 700, padding: '1px 5px',
+                          background: 'rgba(34,197,94,0.1)', color: 'var(--green)',
+                          borderRadius: 99, border: '1px solid rgba(34,197,94,0.18)',
+                          textTransform: 'uppercase', letterSpacing: '0.06em',
+                        }}>
+                          Done
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-1)', marginBottom: 8, lineHeight: 1.3 }}>
+                      {mod.title}
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className="progress-bar" style={{ flex: 1 }}>
+                        <div
+                          className="progress-bar-fill"
+                          style={{
+                            width: `${progress}%`,
+                            background: complete ? 'var(--green)' : undefined,
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: '0.68rem', fontWeight: 700, color: complete ? 'var(--green)' : 'var(--text-3)', minWidth: 36, textAlign: 'right' }}>
+                        {doneCount}/{lessons.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  <span style={{
+                    color: 'var(--text-4)',
+                    fontSize: '1.1rem',
+                    transition: 'transform 0.25s ease',
+                    transform: isOpen ? 'rotate(90deg)' : 'none',
+                    flexShrink: 0,
+                  }}>
+                    ›
                   </span>
                 </div>
-              </button>
+              </div>
 
-              {/* Indented Lessons List */}
+              {/* Lessons */}
               {isOpen && (
-                <div className="pl-8 pb-5 flex flex-col gap-3.5 a-slideDown">
+                <div style={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-gold)',
+                  borderTop: 'none',
+                  borderRadius: '0 0 14px 14px',
+                  overflow: 'hidden',
+                  animation: 'fadeIn 0.2s ease',
+                }}>
                   {lessons.map((lesson, li) => {
                     const status = getLessonStatus(lesson.id);
                     const done = status === 'completed';
 
                     return (
-                      <button
+                      <div
                         key={lesson.id}
                         onClick={() => navigate(`/lesson/${lesson.id}`)}
-                        className="w-full text-left flex items-center justify-between transition-all active:scale-[0.98] group/item gap-4"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 16px',
+                          borderBottom: li < lessons.length - 1 ? '1px solid var(--border)' : 'none',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {/* Monospace Lesson Index */}
-                          <span className="font-mono text-[0.7rem] text-text-3 min-w-[28px]">
-                            {String(mod.order).padStart(2, '0')}.{li + 1}
-                          </span>
-                          {/* Title */}
-                          <span className="text-xs font-medium text-text-2 group-hover/item:text-accent transition-colors truncate">
-                            {lesson.title}
-                          </span>
+                        {/* Number / check */}
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+                          background: done ? 'rgba(34,197,94,0.08)' : 'var(--bg-overlay)',
+                          border: `1px solid ${done ? 'rgba(34,197,94,0.2)' : 'var(--border)'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: done ? '0.8rem' : '0.7rem',
+                          fontWeight: 700,
+                          color: done ? 'var(--green)' : 'var(--text-3)',
+                        }}>
+                          {done ? '✓' : li + 1}
                         </div>
 
-                        {/* Typographic status or action */}
-                        {done ? (
-                          <span className="font-mono text-[0.55rem] text-accent/80 tracking-wider flex-shrink-0">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="font-mono text-[0.55rem] text-text-4 tracking-wider flex-shrink-0 group-hover/item:text-accent">
-                            START
-                          </span>
-                        )}
-                      </button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{
+                            fontSize: '0.875rem',
+                            fontWeight: 500,
+                            color: done ? 'var(--text-2)' : 'var(--text-1)',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {lesson.title}
+                          </p>
+                          <p style={{ fontSize: '0.7rem', color: done ? 'var(--green)' : 'var(--text-3)', marginTop: 2 }}>
+                            {done ? 'Completed' : ''}
+                          </p>
+                        </div>
+
+                        <span style={{ color: 'var(--text-4)', fontSize: '0.9rem', flexShrink: 0 }}>›</span>
+                      </div>
                     );
                   })}
                 </div>
