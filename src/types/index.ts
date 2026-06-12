@@ -37,6 +37,7 @@ export interface LessonProgress {
   lesson_id: string;
   status: 'not_started' | 'in_progress' | 'completed';
   completed_at?: string;
+  last_position?: number;
 }
 
 export interface AppNotification {

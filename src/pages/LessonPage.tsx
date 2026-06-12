@@ -1,14 +1,23 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { generateId } from '../utils/helpers';
 
-// Helper to transform any YouTube URL (watch, share, shorts) into an embed URL
-function getEmbedUrl(url: string | undefined): string | undefined {
+// Helper to transform any YouTube URL (watch, share, shorts) into an embed URL with jsapi enabled
+function getEmbedUrl(url: string | undefined, startSeconds: number = 0): string | undefined {
   if (!url) return undefined;
 
-  // If already an embed URL, return it
-  if (url.includes('/embed/')) return url;
+  const jsapiParam = 'enablejsapi=1';
+
+  // If already an embed URL, append jsapi and start position parameters
+  if (url.includes('/embed/')) {
+    const separator = url.includes('?') ? '&' : '?';
+    let resUrl = `${url}${separator}${jsapiParam}`;
+    if (startSeconds > 0 && !url.includes('start=')) {
+      resUrl += `&start=${startSeconds}`;
+    }
+    return resUrl;
+  }
 
   // Match youtube watch link, share link, or shorts link
   const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]+)/;
@@ -23,17 +32,19 @@ function getEmbedUrl(url: string | undefined): string | undefined {
     if (timeMatch && timeMatch[1]) {
       const seconds = timeMatch[1].replace('s', '');
       startParam = `&start=${seconds}`;
+    } else if (startSeconds > 0) {
+      startParam = `&start=${startSeconds}`;
     }
     
-    return `https://www.youtube.com/embed/${videoId}?rel=0${startParam}`;
+    return `https://www.youtube.com/embed/${videoId}?rel=0&${jsapiParam}${startParam}`;
   }
 
   return url;
 }
 
-// Simple "lesson complete" toast — no XP, no levels
+// Simple "lesson complete" toast
 function CompletedToast({ onDone }: { onDone: () => void }) {
-  React.useEffect(() => {
+  useEffect(() => {
     const t = setTimeout(onDone, 2200);
     return () => clearTimeout(t);
   }, [onDone]);
@@ -79,8 +90,48 @@ export default function LessonPage() {
   const module = lesson ? state.modules.find(m => m.id === lesson.module_id) : null;
   const status = lesson ? getLessonStatus(lesson.id) : 'not_started';
 
+  const savedProgress = lesson ? state.lessonProgress.find(p => p.lesson_id === lesson.id) : null;
+  const startSec = savedProgress?.last_position || 0;
+
   const [showToast, setShowToast] = useState(false);
   const [completing, setCompleting] = useState(false);
+
+  // Track the ref to avoid state changes firing on stale functions
+  const onVideoTimeUpdate = useCallback((time: number) => {
+    if (!lesson) return;
+    const prevPosition = savedProgress?.last_position || 0;
+    
+    // Save progress updates every 4 seconds to reduce redundant database triggers
+    if (Math.abs(time - prevPosition) >= 4) {
+      dispatch({
+        type: 'UPDATE_LESSON_PROGRESS',
+        payload: { lessonId: lesson.id, lastPosition: time },
+      });
+    }
+  }, [lesson, savedProgress, dispatch]);
+
+  // Handle messages from the embedded YouTube JSAPI
+  useEffect(() => {
+    if (!lesson) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        let data = event.data;
+        if (typeof data === 'string') {
+          data = JSON.parse(data);
+        }
+        if (data && data.event === 'infoDelivery' && data.info && typeof data.info.currentTime === 'number') {
+          const time = Math.floor(data.info.currentTime);
+          if (time > 0) {
+            onVideoTimeUpdate(time);
+          }
+        }
+      } catch { /* ignore parsing errors of unrelated messages */ }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [lesson?.id, onVideoTimeUpdate]);
 
   const handleComplete = useCallback(() => {
     if (!lesson || status === 'completed' || completing) return;
@@ -102,6 +153,7 @@ export default function LessonPage() {
     });
 
     setShowToast(true);
+    setCompleting(false);
   }, [lesson, status, completing, dispatch]);
 
   if (!lesson || !module) {
@@ -168,8 +220,14 @@ export default function LessonPage() {
   const currentIdx = moduleLessons.findIndex(l => l.id === lesson.id);
   const nextLesson = moduleLessons[currentIdx + 1];
 
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
   return (
-    <div className="page" style={{ paddingBottom: 100 }}>
+    <div className="page" style={{ paddingBottom: 112 }}>
       {showToast && <CompletedToast onDone={() => setShowToast(false)} />}
 
       {/* ── Header ── */}
@@ -216,25 +274,49 @@ export default function LessonPage() {
         </div>
       </div>
 
-      {/* ── Video ── */}
+      {/* ── Mobile-Optimized Video Container ── */}
       {lesson.video_url && (
         <div
           className="a-fadeUp"
           style={{
+            position: 'relative',
             borderRadius: 'var(--radius-lg)',
             overflow: 'hidden',
-            marginBottom: 16,
+            marginBottom: startSec > 0 ? 10 : 20,
             border: '1px solid var(--border-mid)',
             background: '#000',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
           }}
         >
           <iframe
-            src={getEmbedUrl(lesson.video_url)}
+            src={getEmbedUrl(lesson.video_url, startSec)}
             style={{ width: '100%', aspectRatio: '16/9', border: 'none', display: 'block' }}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             title={lesson.title}
           />
+        </div>
+      )}
+
+      {/* ── Auto-Resume Notification Badge ── */}
+      {startSec > 0 && (
+        <div 
+          className="a-fadeIn"
+          style={{ 
+            fontSize: '0.7rem', 
+            color: 'var(--gold-bright)', 
+            fontWeight: 600, 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            gap: 4, 
+            marginBottom: 20,
+            background: 'rgba(201, 162, 39, 0.05)',
+            border: '1px solid rgba(201, 162, 39, 0.15)',
+            borderRadius: '6px',
+            padding: '3px 8px'
+          }}
+        >
+          <span>•</span> Resumed from {formatTime(startSec)}
         </div>
       )}
 

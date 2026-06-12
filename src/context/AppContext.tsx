@@ -2,7 +2,7 @@ import { createContext, useContext, useReducer, useEffect, useRef, type ReactNod
 import type { User, Module, Lesson, LessonProgress, AppNotification } from '../types';
 import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS } from '../data/mockData';
 import { generateId } from '../utils/helpers';
-import { supabase } from '../services/supabase';
+import * as dbService from '../services/dbService';
 
 // ===== State =====
 interface AppState {
@@ -21,6 +21,7 @@ interface AppState {
 type AppAction =
   | { type: 'SET_USER'; payload: User }
   | { type: 'COMPLETE_LESSON'; payload: { lessonId: string } }
+  | { type: 'UPDATE_LESSON_PROGRESS'; payload: { lessonId: string; lastPosition: number } }
   | { type: 'ADD_NOTIFICATION'; payload: AppNotification }
   | { type: 'DISMISS_NOTIFICATION'; payload: string }
   | { type: 'LOAD_STATE'; payload: Partial<AppState> }
@@ -61,11 +62,37 @@ function appReducer(state: AppState, action: AppAction): AppState {
       if (existing?.status === 'completed') return state;
 
       const newProgress: LessonProgress = {
-        id: generateId(),
+        id: existing ? existing.id : generateId(),
         user_id: state.user.id,
         lesson_id: lessonId,
         status: 'completed',
         completed_at: new Date().toISOString(),
+        last_position: existing?.last_position || 0,
+      };
+
+      const updatedProgress = existing
+        ? state.lessonProgress.map(p => p.id === existing.id ? newProgress : p)
+        : [...state.lessonProgress, newProgress];
+
+      return { ...state, lessonProgress: updatedProgress };
+    }
+
+    case 'UPDATE_LESSON_PROGRESS': {
+      const { lessonId, lastPosition } = action.payload;
+      const existing = state.lessonProgress.find(
+        p => p.lesson_id === lessonId && p.user_id === state.user.id
+      );
+      
+      // Don't trigger state update if position hasn't changed meaningfully
+      if (existing && existing.last_position === lastPosition) return state;
+
+      const newProgress: LessonProgress = {
+        id: existing ? existing.id : generateId(),
+        user_id: state.user.id,
+        lesson_id: lessonId,
+        status: existing ? existing.status : 'in_progress',
+        completed_at: existing ? existing.completed_at : undefined,
+        last_position: lastPosition,
       };
 
       const updatedProgress = existing
@@ -156,8 +183,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...initial,
           user: parsed.user || initial.user,
           lessonProgress: parsed.lessonProgress || [],
-          // modules/lessons are intentionally NOT restored from localStorage
-          // they will always be loaded fresh from Supabase on bootstrap
         };
       } else if (tgUserId) {
         result = {
@@ -182,6 +207,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const isLoadedRef = useRef(false);
   const persistedProgressIds = useRef<Set<string>>(new Set());
+  const lastSyncedPositions = useRef<Map<string, number>>(new Map());
   const lastSavedUser = useRef<{ last_login: string; is_admin: boolean } | null>(null);
   const lastSavedLeaderboardUsers = useRef<User[] | null>(null);
 
@@ -189,7 +215,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const lastSavedModuleIds = useRef<Set<string>>(new Set());
   const lastSavedLessonIds = useRef<Set<string>>(new Set());
 
-  // Persist user progress to localStorage (NOT modules/lessons — those live in Supabase)
+  // Persist user progress to localStorage
   useEffect(() => {
     const key = getStorageKey();
     localStorage.setItem(key, JSON.stringify({
@@ -239,55 +265,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // ── Upsert current user ──
-        let dbUser = null;
-        const { data: existingUsers, error: fetchErr } = await supabase
-          .from('users')
-          .select('*')
-          .eq('telegram_id', telegramId);
+        // ── Upsert current user (via Service Layer) ──
+        let dbUser = await dbService.fetchUser(telegramId);
 
-        if (fetchErr) throw fetchErr;
-
-        if (existingUsers && existingUsers.length > 0) {
-          dbUser = existingUsers[0];
+        if (dbUser) {
           if (dbUser.is_admin !== isAdmin) {
-            const { data: updated } = await supabase
-              .from('users')
-              .update({ is_admin: isAdmin })
-              .eq('id', dbUser.id)
-              .select();
-            if (updated?.length) dbUser = updated[0];
+            dbUser = await dbService.updateUserAdmin(dbUser.id, isAdmin);
           }
         } else {
-          const { data: inserted, error: insertErr } = await supabase
-            .from('users')
-            .insert({
-              telegram_id: telegramId,
-              first_name: firstName,
-              username,
-              is_admin: isAdmin,
-              last_login: new Date().toISOString(),
-            })
-            .select();
-          if (insertErr) throw insertErr;
-          if (inserted?.length) dbUser = inserted[0];
+          dbUser = await dbService.createUser(telegramId, firstName, username, isAdmin);
         }
 
         if (!dbUser) throw new Error('Failed to resolve user');
 
-        // ── Fetch all data in parallel ──
+        // ── Fetch all data in parallel (via Service Layer) ──
         const [progressRes, usersRes, modulesRes, lessonsRes] = await Promise.all([
-          supabase.from('lesson_progress').select('*').eq('user_id', dbUser.id),
-          supabase.from('users').select('*'),
-          supabase.from('modules').select('*').order('order', { ascending: true }),
-          supabase.from('lessons').select('*').order('order', { ascending: true }),
+          dbService.fetchLessonProgress(dbUser.id),
+          dbService.fetchLeaderboardUsers(),
+          dbService.fetchModules(),
+          dbService.fetchLessons(),
         ]);
 
-        const lessonProgress = progressRes.data || [];
-        const allUsers = usersRes.data || [];
+        const lessonProgress = progressRes || [];
+        const allUsers = usersRes || [];
 
-        // ── Resolve modules (Supabase first, seed from mockData if empty) ──
-        let dbModules: Module[] = (modulesRes.data || []).map(m => ({
+        // ── Resolve modules (seed from mockData if empty) ──
+        let dbModules: Module[] = modulesRes.map(m => ({
           id: m.id,
           title: m.title,
           description: m.description || '',
@@ -297,22 +300,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
 
         if (dbModules.length === 0) {
-          // First run: seed mockData modules into Supabase
           console.log('No modules in Supabase — seeding from mockData…');
           for (const mod of MOCK_MODULES) {
-            const { error } = await supabase.from('modules').upsert({
-              id: mod.id,
-              title: mod.title,
-              description: mod.description,
-              icon: mod.icon,
-              order: mod.order,
-            });
-            if (!error) dbModules.push(mod);
+            await dbService.upsertModule(mod);
+            dbModules.push(mod);
           }
         }
 
-        // ── Resolve lessons (Supabase first, seed from mockData if empty) ──
-        let dbLessons: Lesson[] = (lessonsRes.data || []).map(l => ({
+        // ── Resolve lessons (seed from mockData if empty) ──
+        let dbLessons: Lesson[] = lessonsRes.map(l => ({
           id: l.id,
           module_id: l.module_id,
           title: l.title,
@@ -325,25 +321,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }));
 
         if (dbLessons.length === 0) {
-          // First run: seed mockData lessons into Supabase
           console.log('No lessons in Supabase — seeding from mockData…');
           for (const lesson of MOCK_LESSONS) {
-            const { error } = await supabase.from('lessons').upsert({
-              id: lesson.id,
-              module_id: lesson.module_id,
-              title: lesson.title,
-              description: lesson.description,
-              content: lesson.content,
-              thumbnail: lesson.thumbnail,
-              order: lesson.order,
-              video_url: lesson.video_url || null,
-            });
-            if (!error) dbLessons.push(lesson);
+            await dbService.upsertLesson(lesson);
+            dbLessons.push(lesson);
           }
         }
 
-        // ── Track persisted IDs for diffing in sync effect ──
-        lessonProgress.forEach(p => persistedProgressIds.current.add(p.id));
+        // ── Track persisted IDs and positions for diffing ──
+        lessonProgress.forEach(p => {
+          persistedProgressIds.current.add(p.id);
+          if (p.last_position !== undefined) {
+            lastSyncedPositions.current.set(p.id, p.last_position);
+          }
+        });
         dbModules.forEach(m => lastSavedModuleIds.current.add(m.id));
         dbLessons.forEach(l => lastSavedLessonIds.current.add(l.id));
         lastSavedUser.current = { last_login: dbUser.last_login, is_admin: dbUser.is_admin };
@@ -389,6 +380,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               lesson_id: p.lesson_id,
               status: p.status,
               completed_at: p.completed_at,
+              last_position: p.last_position || 0,
             })),
           },
         });
@@ -409,18 +401,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!isLoadedRef.current) return;
 
     const sync = async () => {
-      // Sync new lesson progress
-      const newProgress = state.lessonProgress.filter(p => !persistedProgressIds.current.has(p.id));
+      // Sync new/updated lesson progress
+      const newProgress = state.lessonProgress.filter(p => {
+        const hasId = persistedProgressIds.current.has(p.id);
+        const lastPos = lastSyncedPositions.current.get(p.id);
+        // Sync if ID is not persisted yet, or if last_position changed
+        return !hasId || p.last_position !== lastPos;
+      });
+
       for (const progress of newProgress) {
         try {
-          const { error } = await supabase.from('lesson_progress').insert({
-            id: progress.id,
-            user_id: state.user.id,
-            lesson_id: progress.lesson_id,
-            status: progress.status,
-            completed_at: progress.completed_at,
-          });
-          if (!error) persistedProgressIds.current.add(progress.id);
+          await dbService.syncLessonProgress(state.user.id, progress);
+          persistedProgressIds.current.add(progress.id);
+          if (progress.last_position !== undefined) {
+            lastSyncedPositions.current.set(progress.id, progress.last_position);
+          }
         } catch (err) {
           console.error('Failed to sync progress:', err);
         }
@@ -431,7 +426,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const last = lastSavedUser.current;
       if (last && u.last_login !== last.last_login) {
         try {
-          await supabase.from('users').update({ last_login: u.last_login }).eq('id', u.id);
+          await dbService.syncUserLastLogin(u.id, u.last_login);
           lastSavedUser.current = { last_login: u.last_login, is_admin: u.is_admin };
         } catch (err) {
           console.error('Failed to sync user:', err);
@@ -444,7 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           const prev = lastSavedLeaderboardUsers.current.find(lu => lu.id === user.id);
           if (prev && user.is_banned !== prev.is_banned) {
             try {
-              await supabase.from('users').update({ is_banned: user.is_banned }).eq('id', user.id);
+              await dbService.syncUserBanned(user.id, user.is_banned);
             } catch (err) {
               console.error('Failed to sync ban:', err);
             }
@@ -468,13 +463,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // ── Upsert new/updated modules ──
       for (const mod of state.modules) {
         try {
-          await supabase.from('modules').upsert({
-            id: mod.id,
-            title: mod.title,
-            description: mod.description,
-            icon: mod.icon,
-            order: mod.order,
-          });
+          await dbService.upsertModule(mod);
           lastSavedModuleIds.current.add(mod.id);
         } catch (err) {
           console.error('Failed to upsert module:', err);
@@ -485,7 +474,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       for (const savedId of lastSavedModuleIds.current) {
         if (!currentModuleIds.has(savedId)) {
           try {
-            await supabase.from('modules').delete().eq('id', savedId);
+            await dbService.deleteModule(savedId);
             lastSavedModuleIds.current.delete(savedId);
           } catch (err) {
             console.error('Failed to delete module:', err);
@@ -496,16 +485,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // ── Upsert new/updated lessons ──
       for (const lesson of state.lessons) {
         try {
-          await supabase.from('lessons').upsert({
-            id: lesson.id,
-            module_id: lesson.module_id,
-            title: lesson.title,
-            description: lesson.description,
-            content: lesson.content,
-            thumbnail: lesson.thumbnail,
-            order: lesson.order,
-            video_url: lesson.video_url || null,
-          });
+          await dbService.upsertLesson(lesson);
           lastSavedLessonIds.current.add(lesson.id);
         } catch (err) {
           console.error('Failed to upsert lesson:', err);
@@ -516,7 +496,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       for (const savedId of lastSavedLessonIds.current) {
         if (!currentLessonIds.has(savedId)) {
           try {
-            await supabase.from('lessons').delete().eq('id', savedId);
+            await dbService.deleteLesson(savedId);
             lastSavedLessonIds.current.delete(savedId);
           } catch (err) {
             console.error('Failed to delete lesson:', err);

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import BottomNav from './components/BottomNav';
@@ -6,11 +6,29 @@ import HomePage from './pages/HomePage';
 import LearnPage from './pages/LearnPage';
 import LessonPage from './pages/LessonPage';
 import ProfilePage from './pages/ProfilePage';
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import ModuleManager from './pages/admin/ModuleManager';
-import LessonManager from './pages/admin/LessonManager';
-import UserManager from './pages/admin/UserManager';
+
+// Lazy load admin pages
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const ModuleManager = lazy(() => import('./pages/admin/ModuleManager'));
+const LessonManager = lazy(() => import('./pages/admin/LessonManager'));
+const UserManager = lazy(() => import('./pages/admin/UserManager'));
+
+function AdminLoadingFallback() {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '50dvh',
+      color: 'var(--text-3, #52545e)',
+      fontSize: '0.8rem',
+      fontFamily: 'var(--font-mono, monospace)',
+    }}>
+      Loading console...
+    </div>
+  );
+}
 
 function AppContent() {
   const { state } = useApp();
@@ -88,7 +106,14 @@ function AppContent() {
         <Route path="/learn" element={<LearnPage />} />
         <Route path="/lesson/:id" element={<LessonPage />} />
         <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route 
+          path="/admin" 
+          element={
+            <Suspense fallback={<AdminLoadingFallback />}>
+              <AdminLayout />
+            </Suspense>
+          }
+        >
           <Route index element={<AdminDashboard />} />
           <Route path="modules" element={<ModuleManager />} />
           <Route path="lessons" element={<LessonManager />} />

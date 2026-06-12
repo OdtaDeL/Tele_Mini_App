@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import Skeleton from '../components/ui/Skeleton';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -24,6 +25,69 @@ export default function HomePage() {
     }
     return null;
   })();
+
+  if (state.isLoading) {
+    return (
+      <div className="page page-top">
+        {/* ── Greeting Skeleton ── */}
+        <div style={{ marginBottom: 28 }}>
+          <Skeleton width="80px" height="12px" style={{ marginBottom: 8 }} />
+          <Skeleton width="180px" height="24px" style={{ marginBottom: 8 }} />
+          <Skeleton width="130px" height="14px" />
+        </div>
+
+        {/* ── Progress Card Skeleton ── */}
+        <div
+          style={{
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-mid)',
+            borderRadius: 'var(--radius-xl)',
+            padding: '20px',
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+            <Skeleton width="48px" height="48px" borderRadius="14px" />
+            <div style={{ flex: 1 }}>
+              <Skeleton width="100px" height="14px" style={{ marginBottom: 6 }} />
+              <Skeleton width="60px" height="12px" />
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <Skeleton width="40px" height="20px" style={{ marginBottom: 4 }} />
+              <Skeleton width="50px" height="10px" />
+            </div>
+          </div>
+          <Skeleton width="100%" height="8px" borderRadius="4px" style={{ marginBottom: 10 }} />
+          <Skeleton width="150px" height="12px" />
+        </div>
+
+        {/* ── Stats Skeleton ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 24 }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '16px 14px' }}>
+            <Skeleton width="40px" height="24px" style={{ margin: '0 auto 8px' }} />
+            <Skeleton width="70px" height="10px" style={{ margin: '0 auto' }} />
+          </div>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '16px 14px' }}>
+            <Skeleton width="40px" height="24px" style={{ margin: '0 auto 8px' }} />
+            <Skeleton width="70px" height="10px" style={{ margin: '0 auto' }} />
+          </div>
+        </div>
+
+        {/* ── Continue Learning Skeleton ── */}
+        <div style={{ marginBottom: 24 }}>
+          <Skeleton width="110px" height="12px" style={{ marginBottom: 10 }} />
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-gold)', borderRadius: 'var(--radius-lg)', padding: '16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Skeleton width="44px" height="44px" borderRadius="12px" />
+            <div style={{ flex: 1 }}>
+              <Skeleton width="80px" height="10px" style={{ marginBottom: 6 }} />
+              <Skeleton width="140px" height="14px" />
+            </div>
+            <Skeleton width="10px" height="16px" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page page-top">

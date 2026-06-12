@@ -101,6 +101,11 @@ body {
   to { transform: rotate(360deg); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
 @keyframes xpRise {
   0%   { opacity: 0; transform: translateY(8px) scale(0.9); }
   15%  { opacity: 1; transform: translateY(0) scale(1); }
@@ -133,6 +138,7 @@ body {
 .a-scaleIn  { animation: scaleIn 0.35s cubic-bezier(0.16,1,0.3,1) both; }
 .a-slideDown { animation: slideDown 0.25s ease both; }
 .a-spin     { animation: spinCw 0.9s linear infinite; }
+.a-pulse    { animation: pulse 1.6s ease-in-out infinite; }
 .a-xpRise   { animation: xpRise 1.8s cubic-bezier(0.16,1,0.3,1) forwards; }
 .a-progress { animation: progressFill 1s cubic-bezier(0.4,0,0.2,1) both; }
 .a-glow     { animation: glowPulse 2s ease-in-out infinite; }
