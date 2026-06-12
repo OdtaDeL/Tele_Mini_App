@@ -582,7 +582,7 @@ body {
 /* ===== Page Container ===== */
 .page {
   flex: 1;
-  padding: 0 16px 80px;
+  padding: 0 16px 112px;
   max-width: 480px;
   margin: 0 auto;
   width: 100%;
