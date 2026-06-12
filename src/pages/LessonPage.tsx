@@ -3,6 +3,34 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { generateId } from '../utils/helpers';
 
+// Helper to transform any YouTube URL (watch, share, shorts) into an embed URL
+function getEmbedUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+
+  // If already an embed URL, return it
+  if (url.includes('/embed/')) return url;
+
+  // Match youtube watch link, share link, or shorts link
+  const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]+)/;
+  const match = url.match(youtubeRegex);
+
+  if (match && match[1]) {
+    const videoId = match[1];
+    let startParam = '';
+    
+    // Check for start time (t= or start= or time=)
+    const timeMatch = url.match(/[?&](?:t|start|time)=(\d+s?)/);
+    if (timeMatch && timeMatch[1]) {
+      const seconds = timeMatch[1].replace('s', '');
+      startParam = `&start=${seconds}`;
+    }
+    
+    return `https://www.youtube.com/embed/${videoId}?rel=0${startParam}`;
+  }
+
+  return url;
+}
+
 // Simple "lesson complete" toast — no XP, no levels
 function CompletedToast({ onDone }: { onDone: () => void }) {
   React.useEffect(() => {
@@ -201,8 +229,9 @@ export default function LessonPage() {
           }}
         >
           <iframe
-            src={lesson.video_url}
+            src={getEmbedUrl(lesson.video_url)}
             style={{ width: '100%', aspectRatio: '16/9', border: 'none', display: 'block' }}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
             title={lesson.title}
           />
