@@ -1,6 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
 import type { User, Module, Lesson, LessonProgress, AppNotification } from '../types';
-import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS, MOCK_LEADERBOARD_USERS } from '../data/mockData';
+import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS } from '../data/mockData';
 import { generateId } from '../utils/helpers';
 import { supabase } from '../services/supabase';
 
@@ -36,12 +36,12 @@ type AppAction =
 // ===== Initial State =====
 const initialState: AppState = {
   user: MOCK_USER,
-  modules: MOCK_MODULES,
-  lessons: MOCK_LESSONS,
+  modules: [],
+  lessons: [],
   lessonProgress: [],
-  leaderboardUsers: MOCK_LEADERBOARD_USERS,
+  leaderboardUsers: [],
   notifications: [],
-  isLoading: false,
+  isLoading: true,
   isMember: true,
   isCheckingMembership: false,
 };
@@ -156,8 +156,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...initial,
           user: parsed.user || initial.user,
           lessonProgress: parsed.lessonProgress || [],
-          modules: parsed.modules || initial.modules,
-          lessons: parsed.lessons || initial.lessons,
+          // modules/lessons are intentionally NOT restored from localStorage
+          // they will always be loaded fresh from Supabase on bootstrap
         };
       } else if (tgUserId) {
         result = {
@@ -185,18 +185,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const lastSavedUser = useRef<{ last_login: string; is_admin: boolean } | null>(null);
   const lastSavedLeaderboardUsers = useRef<User[] | null>(null);
 
-  // Persist to localStorage
+  // Track last-saved snapshot of modules and lessons for diffing
+  const lastSavedModuleIds = useRef<Set<string>>(new Set());
+  const lastSavedLessonIds = useRef<Set<string>>(new Set());
+
+  // Persist user progress to localStorage (NOT modules/lessons — those live in Supabase)
   useEffect(() => {
     const key = getStorageKey();
     localStorage.setItem(key, JSON.stringify({
       user: state.user,
       lessonProgress: state.lessonProgress,
-      modules: state.modules,
-      lessons: state.lessons,
     }));
-  }, [state.user, state.lessonProgress, state.modules, state.lessons]);
+  }, [state.user, state.lessonProgress]);
 
-  // Bootstrap from Supabase
+  // ===== Bootstrap from Supabase =====
   useEffect(() => {
     const bootstrap = async () => {
       const tg = window.Telegram?.WebApp;
@@ -237,7 +239,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Upsert user in Supabase (no xp/level/streak fields)
+        // ── Upsert current user ──
         let dbUser = null;
         const { data: existingUsers, error: fetchErr } = await supabase
           .from('users')
@@ -273,13 +275,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (!dbUser) throw new Error('Failed to resolve user');
 
-        const [progressRes, usersRes] = await Promise.all([
+        // ── Fetch all data in parallel ──
+        const [progressRes, usersRes, modulesRes, lessonsRes] = await Promise.all([
           supabase.from('lesson_progress').select('*').eq('user_id', dbUser.id),
           supabase.from('users').select('*'),
+          supabase.from('modules').select('*').order('order', { ascending: true }),
+          supabase.from('lessons').select('*').order('order', { ascending: true }),
         ]);
 
         const lessonProgress = progressRes.data || [];
         const allUsers = usersRes.data || [];
+
+        // ── Resolve modules (Supabase first, seed from mockData if empty) ──
+        let dbModules: Module[] = (modulesRes.data || []).map(m => ({
+          id: m.id,
+          title: m.title,
+          description: m.description || '',
+          icon: m.icon || '📖',
+          order: m.order || 1,
+          lessons_count: 0,
+        }));
+
+        if (dbModules.length === 0) {
+          // First run: seed mockData modules into Supabase
+          console.log('No modules in Supabase — seeding from mockData…');
+          for (const mod of MOCK_MODULES) {
+            const { error } = await supabase.from('modules').upsert({
+              id: mod.id,
+              title: mod.title,
+              description: mod.description,
+              icon: mod.icon,
+              order: mod.order,
+            });
+            if (!error) dbModules.push(mod);
+          }
+        }
+
+        // ── Resolve lessons (Supabase first, seed from mockData if empty) ──
+        let dbLessons: Lesson[] = (lessonsRes.data || []).map(l => ({
+          id: l.id,
+          module_id: l.module_id,
+          title: l.title,
+          description: l.description || '',
+          content: l.content || '',
+          thumbnail: l.thumbnail || '',
+          order: l.order || 1,
+          video_url: l.video_url || undefined,
+          pdf_url: undefined,
+        }));
+
+        if (dbLessons.length === 0) {
+          // First run: seed mockData lessons into Supabase
+          console.log('No lessons in Supabase — seeding from mockData…');
+          for (const lesson of MOCK_LESSONS) {
+            const { error } = await supabase.from('lessons').upsert({
+              id: lesson.id,
+              module_id: lesson.module_id,
+              title: lesson.title,
+              description: lesson.description,
+              content: lesson.content,
+              thumbnail: lesson.thumbnail,
+              order: lesson.order,
+              video_url: lesson.video_url || null,
+            });
+            if (!error) dbLessons.push(lesson);
+          }
+        }
+
+        // ── Track persisted IDs for diffing in sync effect ──
+        lessonProgress.forEach(p => persistedProgressIds.current.add(p.id));
+        dbModules.forEach(m => lastSavedModuleIds.current.add(m.id));
+        dbLessons.forEach(l => lastSavedLessonIds.current.add(l.id));
+        lastSavedUser.current = { last_login: dbUser.last_login, is_admin: dbUser.is_admin };
+
         const leaderboardUsers = allUsers
           .filter(u => u.id !== dbUser.id)
           .map(u => ({
@@ -293,9 +361,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             is_admin: u.is_admin || false,
             is_banned: u.is_banned || false,
           }));
-
-        lessonProgress.forEach(p => persistedProgressIds.current.add(p.id));
-        lastSavedUser.current = { last_login: dbUser.last_login, is_admin: dbUser.is_admin };
         lastSavedLeaderboardUsers.current = leaderboardUsers.map(u => ({ ...u }));
 
         dispatch({
@@ -312,9 +377,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               is_admin: dbUser.is_admin,
               is_banned: dbUser.is_banned,
             },
+            modules: dbModules,
+            lessons: dbLessons,
             leaderboardUsers,
             isMember: true,
             isCheckingMembership: false,
+            isLoading: false,
             lessonProgress: lessonProgress.map(p => ({
               id: p.id,
               user_id: p.user_id,
@@ -328,7 +396,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLoadedRef.current = true;
       } catch (err) {
         console.error('Supabase bootstrap failed:', err);
-        dispatch({ type: 'LOAD_STATE', payload: { isCheckingMembership: false } });
+        dispatch({ type: 'LOAD_STATE', payload: { isCheckingMembership: false, isLoading: false } });
         isLoadedRef.current = true;
       }
     };
@@ -336,7 +404,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bootstrap();
   }, []);
 
-  // Sync changes back to Supabase
+  // ===== Sync user + progress + ban status =====
   useEffect(() => {
     if (!isLoadedRef.current) return;
 
@@ -370,15 +438,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Sync ban status changes from admin panel
+      // Sync ban changes
       if (lastSavedLeaderboardUsers.current) {
         for (const user of state.leaderboardUsers) {
-          const last = lastSavedLeaderboardUsers.current.find(lu => lu.id === user.id);
-          if (last && user.is_banned !== last.is_banned) {
+          const prev = lastSavedLeaderboardUsers.current.find(lu => lu.id === user.id);
+          if (prev && user.is_banned !== prev.is_banned) {
             try {
               await supabase.from('users').update({ is_banned: user.is_banned }).eq('id', user.id);
             } catch (err) {
-              console.error('Failed to sync ban status:', err);
+              console.error('Failed to sync ban:', err);
             }
           }
         }
@@ -388,6 +456,77 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     sync();
   }, [state.user, state.lessonProgress, state.leaderboardUsers]);
+
+  // ===== Sync admin changes to modules & lessons → Supabase =====
+  useEffect(() => {
+    if (!isLoadedRef.current) return;
+
+    const syncContent = async () => {
+      const currentModuleIds = new Set(state.modules.map(m => m.id));
+      const currentLessonIds = new Set(state.lessons.map(l => l.id));
+
+      // ── Upsert new/updated modules ──
+      for (const mod of state.modules) {
+        try {
+          await supabase.from('modules').upsert({
+            id: mod.id,
+            title: mod.title,
+            description: mod.description,
+            icon: mod.icon,
+            order: mod.order,
+          });
+          lastSavedModuleIds.current.add(mod.id);
+        } catch (err) {
+          console.error('Failed to upsert module:', err);
+        }
+      }
+
+      // ── Delete removed modules ──
+      for (const savedId of lastSavedModuleIds.current) {
+        if (!currentModuleIds.has(savedId)) {
+          try {
+            await supabase.from('modules').delete().eq('id', savedId);
+            lastSavedModuleIds.current.delete(savedId);
+          } catch (err) {
+            console.error('Failed to delete module:', err);
+          }
+        }
+      }
+
+      // ── Upsert new/updated lessons ──
+      for (const lesson of state.lessons) {
+        try {
+          await supabase.from('lessons').upsert({
+            id: lesson.id,
+            module_id: lesson.module_id,
+            title: lesson.title,
+            description: lesson.description,
+            content: lesson.content,
+            thumbnail: lesson.thumbnail,
+            order: lesson.order,
+            video_url: lesson.video_url || null,
+          });
+          lastSavedLessonIds.current.add(lesson.id);
+        } catch (err) {
+          console.error('Failed to upsert lesson:', err);
+        }
+      }
+
+      // ── Delete removed lessons ──
+      for (const savedId of lastSavedLessonIds.current) {
+        if (!currentLessonIds.has(savedId)) {
+          try {
+            await supabase.from('lessons').delete().eq('id', savedId);
+            lastSavedLessonIds.current.delete(savedId);
+          } catch (err) {
+            console.error('Failed to delete lesson:', err);
+          }
+        }
+      }
+    };
+
+    syncContent();
+  }, [state.modules, state.lessons]);
 
   // ===== Helpers =====
   const getModuleProgress = (moduleId: string): number => {
