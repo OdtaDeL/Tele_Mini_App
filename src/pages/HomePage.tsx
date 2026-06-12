@@ -12,256 +12,230 @@ export default function HomePage() {
   const totalLessons = state.lessons.length;
   const overallProgress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
-  const stats = [
-    {
-      value: formatNumber(user.xp),
-      label: 'Total XP',
-      icon: '💎',
-      color: 'var(--color-accent-secondary)',
-    },
-    {
-      value: completedLessons,
-      label: 'Lessons',
-      icon: '📖',
-      color: 'var(--color-success)',
-    },
-    {
-      value: getCompletedModulesCount(),
-      label: 'Modules',
-      icon: '🏆',
-      color: 'var(--color-accent-fire)',
-    },
-  ];
+  // Next lesson to continue
+  const nextLesson = (() => {
+    for (const mod of [...state.modules].sort((a, b) => a.order - b.order)) {
+      const lessons = state.lessons.filter(l => l.module_id === mod.id).sort((a, b) => a.order - b.order);
+      const next = lessons.find(l => {
+        const p = state.lessonProgress.find(p => p.lesson_id === l.id);
+        return !p || p.status !== 'completed';
+      });
+      if (next) return { lesson: next, module: mod };
+    }
+    return null;
+  })();
 
   return (
-    <div className="page">
+    <div className="page page-top">
 
-      {/* ── Hero Card ── */}
+      {/* ── Greeting ── */}
+      <div className="a-fadeUp" style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 6 }}>
+          Academy Hub
+        </p>
+        <h1 style={{ fontSize: '1.55rem', fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 1.15, color: 'var(--text-1)' }}>
+          Hey, {user.first_name}
+        </h1>
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-2)', marginTop: 4 }}>
+          {overallProgress === 100
+            ? 'You\'ve completed the course 🏆'
+            : `${overallProgress}% through the course`}
+        </p>
+      </div>
+
+      {/* ── XP Card ── */}
       <div
-        className="card-premium animate-fadeInUp"
-        style={{ marginBottom: '16px' }}
+        className="a-fadeUp d-1"
+        style={{
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-mid)',
+          borderRadius: 'var(--radius-xl)',
+          padding: '20px',
+          marginBottom: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 18,
+        }}
       >
-        {/* Ambient glow orbs */}
-        <div style={{
-          position: 'absolute', top: '-40px', right: '-30px',
-          width: '140px', height: '140px',
-          background: 'radial-gradient(circle, rgba(245,197,24,0.18) 0%, transparent 70%)',
-          borderRadius: '50%', pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-20px', left: '10px',
-          width: '100px', height: '100px',
-          background: 'radial-gradient(circle, rgba(230,126,34,0.12) 0%, transparent 70%)',
-          borderRadius: '50%', pointerEvents: 'none',
-        }} />
+        <ProgressRing progress={xpInfo.progress} size={64} strokeWidth={3}>
+          <div className="avatar" style={{ width: 50, height: 50, fontSize: '1.3rem' }}>
+            {user.first_name[0]}
+          </div>
+        </ProgressRing>
 
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
-          {/* Avatar with progress ring */}
-          <ProgressRing progress={xpInfo.progress} size={76} strokeWidth={4}>
-            <div className="avatar" style={{ width: '60px', height: '60px', fontSize: '1.6rem' }}>
-              {user.first_name[0]}
-            </div>
-          </ProgressRing>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
+            <span className="gold-text" style={{ fontSize: '1.55rem', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1 }}>
+              {formatNumber(user.xp)}
+            </span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              XP
+            </span>
+          </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
-              Welcome back
-            </p>
-            <h1 style={{
-              fontSize: '1.25rem', fontWeight: 800, marginBottom: '6px',
-              letterSpacing: '-0.01em', lineHeight: 1.2,
+          {/* Level info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{
+              fontSize: '0.68rem', fontWeight: 700, padding: '2px 7px',
+              background: 'rgba(201,162,39,0.1)', color: 'var(--gold-bright)',
+              borderRadius: 99, border: '1px solid rgba(201,162,39,0.18)',
+              letterSpacing: '0.03em'
             }}>
-              {user.first_name} 👋
-            </h1>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <span className="badge badge-level">Lv.{user.level} · {getLevelTitle(user.level)}</span>
-              {user.streak > 0 && (
-                <span className="badge badge-streak">🔥 {user.streak}d streak</span>
-              )}
-            </div>
+              LV {user.level}
+            </span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-2)', fontWeight: 500 }}>
+              {getLevelTitle(user.level)}
+            </span>
+            {user.streak > 0 && (
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginLeft: 'auto' }}>
+                {user.streak}d streak
+              </span>
+            )}
           </div>
-        </div>
 
-        {/* XP Progress */}
-        <div style={{ position: 'relative' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-              Level {user.level} → {user.level + 1}
-            </span>
-            <span style={{ fontSize: '0.78rem', fontWeight: 700 }} className="gradient-text">
-              {formatNumber(xpInfo.current)} / {formatNumber(xpInfo.next)} XP
-            </span>
+          {/* XP bar */}
+          <div>
+            <div className="progress-bar progress-bar-thick" style={{ borderRadius: 4 }}>
+              <div
+                className="progress-bar-fill a-progress"
+                style={{ width: `${xpInfo.progress}%`, borderRadius: 4 }}
+              />
+            </div>
+            <p style={{ fontSize: '0.65rem', color: 'var(--text-3)', marginTop: 5, textAlign: 'right' }}>
+              {formatNumber(xpInfo.current)} / {formatNumber(xpInfo.next)} to Lv.{user.level + 1}
+            </p>
           </div>
-          <div className="progress-bar" style={{ height: '10px' }}>
-            <div className="progress-bar-fill animate-progressBar" style={{ width: `${xpInfo.progress}%` }} />
-          </div>
-          <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '6px', textAlign: 'right' }}>
-            {Math.round(xpInfo.progress)}% to next level
-          </p>
         </div>
       </div>
 
-      {/* ── Stats Row ── */}
+      {/* ── Stats row ── */}
       <div
-        className="animate-fadeInUp delay-100"
-        style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}
+        className="a-fadeUp d-2"
+        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 24 }}
       >
-        {stats.map((s) => (
-          <div key={s.label} className="stat-chip">
-            <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{s.icon}</span>
-            <span className="stat-chip-value" style={{ color: s.color }}>{s.value}</span>
-            <span className="stat-chip-label">{s.label}</span>
+        {[
+          { val: completedLessons, of: totalLessons, label: 'Lessons' },
+          { val: getCompletedModulesCount(), of: state.modules.length, label: 'Modules' },
+          { val: user.level, of: null, label: 'Level' },
+        ].map(s => (
+          <div
+            key={s.label}
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-md)',
+              padding: '14px 12px',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '-0.04em', lineHeight: 1, color: 'var(--text-1)' }}>
+              {s.val}
+              {s.of !== null && <span style={{ fontSize: '0.65rem', fontWeight: 500, color: 'var(--text-3)', marginLeft: 2 }}>/{s.of}</span>}
+            </div>
+            <div style={{ fontSize: '0.62rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginTop: 5 }}>
+              {s.label}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* ── Overall Progress ── */}
-      <div className="card-glow animate-fadeInUp delay-200" style={{ marginBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <div>
-            <p className="section-label" style={{ marginBottom: '2px' }}>Course Progress</p>
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700 }}>Supply & Demand Method</h3>
-          </div>
-          <span style={{
-            fontSize: '1.4rem', fontWeight: 900,
-            lineHeight: 1,
-          }} className="gradient-text">{overallProgress}%</span>
-        </div>
-        <div className="progress-bar" style={{ height: '8px', marginBottom: '8px' }}>
+      {/* ── Continue learning ── */}
+      {nextLesson && (
+        <div className="a-fadeUp d-3" style={{ marginBottom: 24 }}>
+          <p className="section-label">Continue learning</p>
+
           <div
-            className="progress-bar-fill"
+            onClick={() => navigate(`/lesson/${nextLesson.lesson.id}`)}
             style={{
-              width: `${overallProgress}%`,
-              background: overallProgress === 100
-                ? 'linear-gradient(90deg, #27ae60, #2ecc71)'
-                : undefined,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-gold)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '16px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              transition: 'border-color 0.15s, background 0.15s',
             }}
-          />
-        </div>
-        <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-          {completedLessons} of {totalLessons} lessons completed
-        </p>
-      </div>
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-elevated)'; }}
+          >
+            {/* Icon */}
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+              background: 'rgba(201,162,39,0.08)',
+              border: '1px solid rgba(201,162,39,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '1.3rem',
+            }}>
+              {nextLesson.module.icon}
+            </div>
 
-      {/* ── Quick Actions ── */}
-      <div className="animate-fadeInUp delay-300" style={{ marginBottom: '20px' }}>
-        <p className="section-label">Quick Actions</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-          {[
-            { label: 'Start Learning', icon: '📚', path: '/learn', color: '#f5c518', desc: 'Continue your path' },
-            { label: 'My Profile', icon: '👤', path: '/profile', color: '#e67e22', desc: 'View your progress' },
-          ].map((action) => (
-            <button
-              key={action.label}
-              id={`quick-${action.label.toLowerCase().replace(/\s/g,'-')}`}
-              onClick={() => navigate(action.path)}
-              style={{
-                background: `linear-gradient(135deg, ${action.color}12, ${action.color}05)`,
-                border: `1px solid ${action.color}25`,
-                borderRadius: '16px',
-                padding: '16px',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.25s ease',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = `${action.color}50`;
-                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 24px ${action.color}20`;
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.borderColor = `${action.color}25`;
-                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
-              }}
-            >
-              <span style={{
-                fontSize: '1.6rem',
-                width: '42px', height: '42px',
-                background: `${action.color}15`,
-                borderRadius: '12px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {action.icon}
-              </span>
-              <div>
-                <p style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--color-text-primary)', marginBottom: '2px' }}>
-                  {action.label}
-                </p>
-                <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
-                  {action.desc}
-                </p>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
+                {nextLesson.module.title}
+              </p>
+              <p style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {nextLesson.lesson.title}
+              </p>
+            </div>
+
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--gold-bright)' }}>
+                +{nextLesson.lesson.xp_reward}
               </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Continue Learning ── */}
-      {completedLessons < totalLessons && (
-        <div className="animate-fadeInUp delay-400">
-          <p className="section-label">Continue Where You Left Off</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {state.modules.map((mod) => {
-              const moduleLessons = state.lessons.filter(l => l.module_id === mod.id);
-              const nextLesson = moduleLessons.find(l => {
-                const progress = state.lessonProgress.find(p => p.lesson_id === l.id);
-                return !progress || progress.status !== 'completed';
-              });
-              if (!nextLesson) return null;
-              const lessonNumber = moduleLessons.findIndex(l => l.id === nextLesson.id) + 1;
-              return (
-                <div
-                  key={mod.id}
-                  className="card-glow"
-                  onClick={() => navigate(`/lesson/${nextLesson.id}`)}
-                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px' }}
-                >
-                  <div style={{
-                    width: '48px', height: '48px', borderRadius: '14px',
-                    background: 'rgba(245,197,24,0.1)', border: '1px solid rgba(245,197,24,0.2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1.6rem', flexShrink: 0,
-                  }}>
-                    {mod.icon}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      {mod.title} · Lesson {lessonNumber}
-                    </p>
-                    <p style={{ fontWeight: 600, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {nextLesson.title}
-                    </p>
-                    <span className="badge badge-xp" style={{ marginTop: '4px' }}>+{nextLesson.xp_reward} XP</span>
-                  </div>
-                  <span style={{
-                    width: '32px', height: '32px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, var(--color-accent-gradient-start), var(--color-accent-gradient-end))',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '1rem', color: '#0a0802', fontWeight: 700, flexShrink: 0,
-                  }}>›</span>
-                </div>
-              );
-            })}
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>xp</div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Completed state */}
-      {completedLessons === totalLessons && totalLessons > 0 && (
-        <div className="animate-fadeInUp delay-400 card-premium" style={{ textAlign: 'center', padding: '28px 20px' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🏆</div>
-          <h3 className="gradient-text" style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '6px' }}>
-            Course Complete!
-          </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-            You've mastered all {totalLessons} lessons. Incredible work!
+      {overallProgress === 100 && totalLessons > 0 && (
+        <div className="a-fadeUp d-3" style={{
+          border: '1px solid var(--border-gold)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '20px 16px',
+          textAlign: 'center',
+          marginBottom: 24,
+        }}>
+          <p className="gold-text" style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: 4 }}>
+            Course Complete
+          </p>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-2)' }}>
+            {totalLessons} lessons mastered
           </p>
         </div>
       )}
+
+      {/* ── Navigate ── */}
+      <div className="a-fadeUp d-4">
+        <p className="section-label">Navigate</p>
+        <div style={{
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+        }}>
+          {[
+            { label: 'Learning Path', sub: `${totalLessons} lessons`, path: '/learn' },
+            { label: 'My Profile',    sub: `Level ${user.level} · ${formatNumber(user.xp)} XP`, path: '/profile' },
+          ].map((item, i) => (
+            <div
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              className="row"
+              style={{ borderBottom: i === 0 ? '1px solid var(--border)' : 'none' }}
+            >
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-1)' }}>{item.label}</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-3)', marginTop: 1 }}>{item.sub}</p>
+              </div>
+              <span style={{ color: 'var(--text-4)', fontSize: '1rem' }}>›</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

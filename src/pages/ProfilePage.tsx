@@ -8,117 +8,123 @@ export default function ProfilePage() {
   const { state, getCompletedLessonsCount, getCompletedModulesCount } = useApp();
   const { user } = state;
   const xpInfo = getXPForNextLevel(user.xp);
-
   const completedLessons = getCompletedLessonsCount();
   const completedModules = getCompletedModulesCount();
 
-  const stats = [
-    { label: 'Level', value: user.level, icon: '⚡', color: '#00cec9' },
-    { label: 'Total XP', value: formatNumber(user.xp), icon: '💎', color: 'var(--color-accent-secondary)' },
-    { label: 'Streak', value: `${user.streak}d`, icon: '🔥', color: 'var(--color-accent-fire)' },
-    { label: 'Lessons', value: completedLessons, icon: '📖', color: 'var(--color-success)' },
-    { label: 'Modules', value: completedModules, icon: '📚', color: '#a29bfe' },
-  ];
-
-  const accountInfo = [
-    { label: 'Telegram ID', value: String(user.telegram_id) },
-    { label: 'Username', value: `@${user.username}` },
-    { label: 'Joined', value: new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
-    { label: 'Role', value: user.is_admin ? '⚙️ Admin' : '👤 Member' },
-  ];
-
   return (
-    <div className="page">
-      <div className="page-header">
-        <div style={{ flex: 1 }}>
-          <p className="section-label" style={{ marginBottom: '2px' }}>Your account</p>
-          <h1 className="page-title">Profile</h1>
-        </div>
-      </div>
+    <div className="page page-top">
 
-      {/* ── Profile Hero ── */}
-      <div
-        className="card-premium animate-fadeInUp"
-        style={{ marginBottom: '16px', textAlign: 'center' }}
-      >
-        {/* Decorative glows */}
-        <div style={{
-          position: 'absolute', top: '-50px', left: '50%', transform: 'translateX(-50%)',
-          width: '200px', height: '200px',
-          background: 'radial-gradient(circle, rgba(245,197,24,0.12) 0%, transparent 70%)',
-          borderRadius: '50%', pointerEvents: 'none',
-        }} />
-
-        <div style={{ position: 'relative' }}>
-          {/* Avatar ring */}
-          <div style={{ display: 'inline-block', marginBottom: '14px' }}>
-            <ProgressRing progress={xpInfo.progress} size={100} strokeWidth={4}>
-              <div className="avatar" style={{ width: '80px', height: '80px', fontSize: '2.2rem' }}>
-                {user.first_name[0]}
-              </div>
-            </ProgressRing>
-          </div>
-
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '3px', letterSpacing: '-0.01em' }}>
-            {user.first_name}
-          </h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '12px' }}>
-            @{user.username}
-          </p>
-
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
-            <span className="badge badge-level">Lv.{user.level} · {getLevelTitle(user.level)}</span>
-            {user.streak > 0 && (
-              <span className="badge badge-streak">🔥 {user.streak} day streak</span>
-            )}
-          </div>
-
-          {/* XP progress */}
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                Level {user.level} → {user.level + 1}
-              </span>
-              <span className="gradient-text" style={{ fontSize: '0.78rem', fontWeight: 700 }}>
-                {formatNumber(xpInfo.current)} / {formatNumber(xpInfo.next)} XP
-              </span>
+      {/* ── Identity block ── */}
+      <div className="a-fadeUp" style={{ marginBottom: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <ProgressRing progress={xpInfo.progress} size={64} strokeWidth={3}>
+            <div className="avatar" style={{ width: 50, height: 50, fontSize: '1.3rem' }}>
+              {user.first_name[0]}
             </div>
-            <div className="progress-bar" style={{ height: '8px' }}>
-              <div className="progress-bar-fill" style={{ width: `${xpInfo.progress}%` }} />
-            </div>
-            <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginTop: '5px', textAlign: 'center' }}>
-              {Math.round(xpInfo.progress)}% toward next level
+          </ProgressRing>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: '1.3rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-1)', lineHeight: 1.2 }}>
+              {user.first_name}
+            </h1>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-3)', marginTop: 2 }}>
+              @{user.username}
             </p>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              <span className="badge-level">Lv.{user.level} · {getLevelTitle(user.level)}</span>
+              {user.streak > 0 && (
+                <span className="badge-streak">{user.streak}d streak</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* XP progress strip */}
+        <div style={{ marginTop: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-3)', fontWeight: 500 }}>
+              Level {user.level} → {user.level + 1}
+            </span>
+            <span className="gold-text" style={{ fontSize: '0.72rem', fontWeight: 700 }}>
+              {formatNumber(xpInfo.current)} / {formatNumber(xpInfo.next)} XP
+            </span>
+          </div>
+          <div className="progress-bar progress-bar-thick" style={{ borderRadius: 4 }}>
+            <div className="progress-bar-fill a-progress" style={{ width: `${xpInfo.progress}%`, borderRadius: 4 }} />
           </div>
         </div>
       </div>
 
-      {/* ── Stats Grid ── */}
-      <div
-        className="animate-fadeInUp delay-100"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: '8px',
-          marginBottom: '20px',
-        }}
-      >
-        {stats.map((stat) => (
-          <div key={stat.label} className="stat-chip" style={{ padding: '12px 6px' }}>
-            <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{stat.icon}</span>
-            <span className="stat-chip-value" style={{ color: stat.color, fontSize: '1.05rem' }}>
-              {stat.value}
-            </span>
-            <span className="stat-chip-label" style={{ fontSize: '0.6rem' }}>{stat.label}</span>
-          </div>
-        ))}
+      {/* ── Stats ── */}
+      <div className="a-fadeUp d-1" style={{ marginBottom: 24 }}>
+        <p className="section-label">Stats</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+          {[
+            { val: user.level,         label: 'Level' },
+            { val: formatNumber(user.xp), label: 'XP' },
+            { val: completedLessons,   label: 'Lessons' },
+            { val: completedModules,   label: 'Modules' },
+          ].map(s => (
+            <div
+              key={s.label}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 8px',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{ fontWeight: 800, fontSize: '1.15rem', letterSpacing: '-0.04em', color: 'var(--text-1)', lineHeight: 1 }}>
+                {s.val}
+              </div>
+              <div style={{ fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-3)', marginTop: 5 }}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* ── Account Info ── */}
-      <div className="animate-fadeInUp delay-200" style={{ marginBottom: '16px' }}>
-        <p className="section-label">Account Details</p>
-        <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-          {accountInfo.map((item) => (
+      {/* ── Progress ── */}
+      <div className="a-fadeUp d-2" style={{ marginBottom: 24 }}>
+        <p className="section-label">Course Progress</p>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px' }}>
+          {[
+            { label: 'Lessons', val: completedLessons, total: state.lessons.length },
+            { label: 'Modules', val: completedModules, total: state.modules.length },
+          ].map((item, i) => {
+            const pct = item.total > 0 ? Math.round((item.val / item.total) * 100) : 0;
+            return (
+              <div key={item.label} style={{ marginBottom: i === 0 ? 14 : 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-2)', fontWeight: 500 }}>{item.label}</span>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 700, color: pct === 100 ? 'var(--green)' : 'var(--text-1)' }}>
+                    {item.val}/{item.total}
+                  </span>
+                </div>
+                <div className="progress-bar progress-bar-thick" style={{ borderRadius: 4 }}>
+                  <div
+                    className="progress-bar-fill"
+                    style={{ width: `${pct}%`, borderRadius: 4, background: pct === 100 ? 'var(--green)' : undefined }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Account info ── */}
+      <div className="a-fadeUp d-3" style={{ marginBottom: 24 }}>
+        <p className="section-label">Account</p>
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+          {[
+            { label: 'Telegram ID', value: String(user.telegram_id) },
+            { label: 'Username',    value: `@${user.username}` },
+            { label: 'Member since', value: new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) },
+            { label: 'Role',        value: user.is_admin ? 'Admin' : 'Member' },
+          ].map(item => (
             <div key={item.label} className="info-row">
               <span className="info-row-label">{item.label}</span>
               <span className="info-row-value">{item.value}</span>
@@ -127,49 +133,16 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* ── Learning Summary ── */}
-      <div className="animate-fadeInUp delay-300" style={{ marginBottom: '16px' }}>
-        <p className="section-label">Learning Summary</p>
-        <div className="card-glow">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            {[
-              { label: 'Lessons Completed', value: completedLessons, total: state.lessons.length, color: 'var(--color-success)' },
-              { label: 'Modules Completed', value: completedModules, total: state.modules.length, color: 'var(--color-accent-secondary)' },
-            ].map((item) => {
-              const pct = item.total > 0 ? Math.round((item.value / item.total) * 100) : 0;
-              return (
-                <div key={item.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-                      {item.label}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: item.color }}>
-                      {item.value}/{item.total}
-                    </span>
-                  </div>
-                  <div className="progress-bar" style={{ height: '6px' }}>
-                    <div
-                      className="progress-bar-fill"
-                      style={{ width: `${pct}%`, background: item.color }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Admin Button ── */}
+      {/* Admin button */}
       {user.is_admin && (
-        <div className="animate-fadeInUp delay-400">
+        <div className="a-fadeUp d-4">
           <button
-            className="btn btn-secondary btn-lg"
+            className="btn btn-ghost btn-lg"
             id="admin-panel-btn"
             onClick={() => navigate('/admin')}
-            style={{ width: '100%', borderColor: 'rgba(213,160,23,0.25)' }}
+            style={{ width: '100%' }}
           >
-            ⚙️ Admin Panel
+            Admin Panel
           </button>
         </div>
       )}

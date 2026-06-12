@@ -22,23 +22,17 @@ function AppContent() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '100vh',
-        background: '#070708',
-        color: '#fff',
-        gap: '16px',
-        padding: '24px',
-        textAlign: 'center'
+        minHeight: '100dvh',
+        background: 'var(--bg-base)',
+        gap: 12,
       }}>
         <div style={{
-          width: '32px',
-          height: '32px',
-          border: '3px solid rgba(255,255,255,0.1)',
-          borderTop: '3px solid var(--color-accent-primary)',
+          width: 24, height: 24,
+          border: '2px solid var(--border-mid)',
+          borderTopColor: 'var(--gold)',
           borderRadius: '50%',
-        }} className="animate-spin"></div>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted, #a0aec0)' }}>
-          Verifying group membership...
-        </p>
+        }} className="animate-spin" />
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-3)' }}>Verifying membership…</p>
       </div>
     );
   }
@@ -51,41 +45,37 @@ function AppContent() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: '100vh',
-        background: '#070708',
-        color: '#fff',
-        gap: '20px',
-        padding: '32px',
-        textAlign: 'center'
+        minHeight: '100dvh',
+        background: 'var(--bg-base)',
+        padding: '32px 24px',
+        textAlign: 'center',
+        gap: 16,
       }}>
-        <div style={{ fontSize: '3.5rem', filter: 'drop-shadow(0 0 10px rgba(225, 177, 44, 0.3))' }}>🔒</div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Access Restricted</h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary, #cbd5e0)', maxWidth: '280px', lineHeight: '1.5', margin: 0 }}>
-          This Academy Learning Hub is exclusive to members of our Telegram Group. Please join the group to unlock access.
-        </p>
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: 'var(--bg-elevated)',
+          border: '1px solid var(--border-mid)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '1.4rem', marginBottom: 4,
+        }}>⊘</div>
+        <div>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-1)', marginBottom: 8 }}>
+            Members Only
+          </h2>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-3)', maxWidth: 260, lineHeight: 1.55 }}>
+            This learning hub is exclusive to members of our Telegram group.
+          </p>
+        </div>
         <button
           className="btn btn-primary"
-          style={{
-            padding: '12px 24px',
-            borderRadius: '12px',
-            fontSize: '0.85rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-            background: 'linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary))',
-            color: '#fff',
-            boxShadow: '0 4px 15px rgba(225, 177, 44, 0.4)'
-          }}
+          style={{ marginTop: 8 }}
           onClick={() => {
             const tg = window.Telegram?.WebApp;
-            if (tg) {
-              (tg as any).openTelegramLink(groupLink);
-            } else {
-              window.open(groupLink, '_blank');
-            }
+            if (tg) { (tg as any).openTelegramLink(groupLink); }
+            else { window.open(groupLink, '_blank'); }
           }}
         >
-          Join Telegram Group
+          Join the Group
         </button>
       </div>
     );
@@ -114,11 +104,11 @@ export default function App() {
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (tg) {
-      tg.ready();                    // Báo Telegram app đã load xong
-      tg.expand();                   // Mở full screen
-      tg.setHeaderColor('#0a0e1a'); // Dark header
-      tg.setBackgroundColor('#0a0e1a');
-      tg.enableClosingConfirmation(); // Hỏi trước khi đóng
+      tg.ready();
+      tg.expand();
+      tg.setHeaderColor('#08080a');
+      tg.setBackgroundColor('#08080a');
+      tg.enableClosingConfirmation();
     }
   }, []);
 
