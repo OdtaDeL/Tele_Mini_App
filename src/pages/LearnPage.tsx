@@ -166,7 +166,7 @@ export default function LearnPage() {
                             {lesson.title}
                           </p>
                           <p style={{ fontSize: '0.7rem', color: done ? 'var(--green)' : 'var(--text-3)', marginTop: 2 }}>
-                            {done ? 'Completed' : `+${lesson.xp_reward} XP`}
+                            {done ? 'Completed' : ''}
                           </p>
                         </div>
 

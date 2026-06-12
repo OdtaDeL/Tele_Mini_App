@@ -13,7 +13,6 @@ export default function LessonManager() {
     description: '',
     content: '',
     module_id: '',
-    xp_reward: 25,
     video_url: '',
   });
 
@@ -33,7 +32,6 @@ export default function LessonManager() {
           description: form.description,
           content: form.content,
           module_id: form.module_id,
-          xp_reward: form.xp_reward,
           video_url: form.video_url || undefined,
         },
       });
@@ -46,7 +44,6 @@ export default function LessonManager() {
         content: form.content,
         module_id: form.module_id,
         thumbnail: '',
-        xp_reward: form.xp_reward,
         order: moduleLessons.length + 1,
         video_url: form.video_url || undefined,
       };
@@ -57,7 +54,7 @@ export default function LessonManager() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', description: '', content: '', module_id: '', xp_reward: 25, video_url: '' });
+    setForm({ title: '', description: '', content: '', module_id: '', video_url: '' });
     setEditing(null);
     setShowForm(false);
   };
@@ -69,7 +66,6 @@ export default function LessonManager() {
       description: lesson.description,
       content: lesson.content,
       module_id: lesson.module_id,
-      xp_reward: lesson.xp_reward,
       video_url: lesson.video_url || '',
     });
     setShowForm(true);
@@ -110,7 +106,7 @@ export default function LessonManager() {
 
       {/* Form */}
       {showForm && (
-        <div className="admin-card animate-fadeInDown" style={{ marginBottom: '16px' }}>
+        <div className="admin-card a-slideDown" style={{ marginBottom: '16px' }}>
           <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '12px' }}>
             {editing ? 'Edit Lesson' : 'New Lesson'}
           </h4>
@@ -148,45 +144,36 @@ export default function LessonManager() {
               className="input"
               value={form.video_url}
               onChange={(e) => setForm({ ...form, video_url: e.target.value })}
-              placeholder="YouTube Embed URL (optional)"
+              placeholder="Video Embed URL (optional)"
             />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
-                XP Reward:
-              </label>
-              <input
-                className="input"
-                type="number"
-                value={form.xp_reward}
-                onChange={(e) => setForm({ ...form, xp_reward: parseInt(e.target.value) || 0 })}
-                style={{ width: '80px' }}
-              />
-            </div>
             <button className="btn btn-primary" onClick={handleSubmit}>
-              {editing ? '💾 Save Changes' : '➕ Create Lesson'}
+              {editing ? 'Save Changes' : 'Create Lesson'}
             </button>
           </div>
         </div>
       )}
 
       {/* Lesson List */}
-      {filteredLessons.sort((a, b) => a.order - b.order).map((lesson) => {
-        const mod = state.modules.find(m => m.id === lesson.module_id);
-        return (
-          <div key={lesson.id} className="admin-card" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>{lesson.title}</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                {mod?.icon} {mod?.title} · +{lesson.xp_reward} XP
-              </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {[...filteredLessons].sort((a, b) => a.order - b.order).map((lesson) => {
+          const mod = state.modules.find(m => m.id === lesson.module_id);
+          return (
+            <div key={lesson.id} className="admin-card" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-1)' }}>{lesson.title}</p>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: 2 }}>
+                  {mod?.icon} {mod?.title}
+                  {lesson.video_url && <span style={{ marginLeft: 8, color: 'var(--gold-bright)' }}>· Video</span>}
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(lesson)}>Edit</button>
+                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(lesson.id)}>Del</button>
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button className="btn btn-secondary btn-sm" onClick={() => handleEdit(lesson)}>✏️</button>
-              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(lesson.id)}>🗑</button>
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

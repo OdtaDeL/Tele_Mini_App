@@ -1,7 +1,7 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
 import type { User, Module, Lesson, LessonProgress, AppNotification } from '../types';
 import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS, MOCK_LEADERBOARD_USERS } from '../data/mockData';
-import { generateId, isToday, isYesterday } from '../utils/helpers';
+import { generateId } from '../utils/helpers';
 import { supabase } from '../services/supabase';
 
 // ===== State =====
