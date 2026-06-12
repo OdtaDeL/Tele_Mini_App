@@ -297,7 +297,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 const getStorageKey = (): string => {
   const tg = window.Telegram?.WebApp;
   const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
-  return tgUserId ? `academy_hub_state_tg_${tgUserId}` : 'academy_hub_state_v3';
+  return tgUserId ? `academy_hub_state_tg_v4_${tgUserId}` : 'academy_hub_state_v4';
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -307,7 +307,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let result = { ...initial };
     try {
       const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
-      const actualKey = tgUserId ? `academy_hub_state_tg_${tgUserId}` : 'academy_hub_state_v3';
+      const actualKey = tgUserId ? `academy_hub_state_tg_v4_${tgUserId}` : 'academy_hub_state_v4';
       
       const saved = localStorage.getItem(actualKey);
       if (saved) {
