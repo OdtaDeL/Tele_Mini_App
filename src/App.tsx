@@ -23,7 +23,7 @@ function AppContent() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#0a0e1a',
+        background: '#070708',
         color: '#fff',
         gap: '16px',
         padding: '24px',
@@ -33,7 +33,7 @@ function AppContent() {
           width: '32px',
           height: '32px',
           border: '3px solid rgba(255,255,255,0.1)',
-          borderTop: '3px solid var(--color-accent-primary, #6c5ce7)',
+          borderTop: '3px solid var(--color-accent-primary)',
           borderRadius: '50%',
         }} className="animate-spin"></div>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted, #a0aec0)' }}>
@@ -52,13 +52,13 @@ function AppContent() {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        background: '#0a0e1a',
+        background: '#070708',
         color: '#fff',
         gap: '20px',
         padding: '32px',
         textAlign: 'center'
       }}>
-        <div style={{ fontSize: '3.5rem', filter: 'drop-shadow(0 0 10px rgba(108, 92, 231, 0.3))' }}>🔒</div>
+        <div style={{ fontSize: '3.5rem', filter: 'drop-shadow(0 0 10px rgba(225, 177, 44, 0.3))' }}>🔒</div>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>Access Restricted</h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary, #cbd5e0)', maxWidth: '280px', lineHeight: '1.5', margin: 0 }}>
           This Academy Learning Hub is exclusive to members of our Telegram Group. Please join the group to unlock access.
@@ -72,9 +72,9 @@ function AppContent() {
             fontWeight: 600,
             cursor: 'pointer',
             border: 'none',
-            background: 'linear-gradient(135deg, var(--color-accent-primary, #6c5ce7), var(--color-accent-secondary, #00cec9))',
+            background: 'linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-secondary))',
             color: '#fff',
-            boxShadow: '0 4px 15px rgba(108, 92, 231, 0.4)'
+            boxShadow: '0 4px 15px rgba(225, 177, 44, 0.4)'
           }}
           onClick={() => {
             const tg = window.Telegram?.WebApp;

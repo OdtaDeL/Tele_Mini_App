@@ -31,7 +31,6 @@ export default function LessonPage() {
       payload: { lessonId: lesson.id, xpReward: lesson.xp_reward },
     });
 
-    // XP popup
     setXpAmount(lesson.xp_reward);
     setShowXP(true);
 
@@ -46,7 +45,6 @@ export default function LessonPage() {
       },
     });
 
-    // Check for level up (need to calculate manually since dispatch is async)
     const newXP = state.user.xp + lesson.xp_reward;
     const newLevel = getLevelFromXP(newXP);
     if (newLevel > prevLevel) {
@@ -58,19 +56,19 @@ export default function LessonPage() {
   }, [lesson, status, completing, state.user.level, state.user.xp, dispatch]);
 
   useEffect(() => {
-    // Mark as in_progress when viewing
     if (lesson && status === 'not_started') {
-      // We don't dispatch in_progress to keep it simple
+      // Track as viewed when opening
     }
   }, [lesson, status]);
 
   if (!lesson || !module) {
     return (
-      <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '12px' }}>📭</div>
-          <p style={{ color: 'var(--color-text-muted)' }}>Lesson not found</p>
-          <button className="btn btn-primary" onClick={() => navigate('/learn')} style={{ marginTop: '16px' }}>
+      <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
+        <div className="empty-state">
+          <div className="empty-state-icon">📭</div>
+          <p className="empty-state-title">Lesson not found</p>
+          <p className="empty-state-desc">This lesson may have been removed or doesn't exist.</p>
+          <button className="btn btn-primary" onClick={() => navigate('/learn')} style={{ marginTop: '8px' }}>
             Back to Learn
           </button>
         </div>
@@ -78,7 +76,7 @@ export default function LessonPage() {
     );
   }
 
-  // Simple markdown-like rendering
+  // Markdown-like renderer
   const renderContent = (content: string) => {
     const lines = content.trim().split('\n');
     const elements: React.ReactElement[] = [];
@@ -108,56 +106,37 @@ export default function LessonPage() {
       }
     };
 
-    const formatInline = (text: string): string => {
-      return text
+    const formatInline = (text: string): string =>
+      text
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
         .replace(/`(.+?)`/g, '<code>$1</code>')
-        .replace(/❌/g, '<span style="color: #ff6b6b">❌</span>')
-        .replace(/✅/g, '<span style="color: #00b894">✅</span>');
-    };
+        .replace(/❌/g, '<span style="color:#e74c3c">❌</span>')
+        .replace(/✅/g, '<span style="color:#27ae60">✅</span>');
 
     for (const line of lines) {
       const trimmed = line.trim();
-
-      if (trimmed === '') {
-        flushList();
-        continue;
-      }
-
-      // Headings
+      if (trimmed === '') { flushList(); continue; }
       if (trimmed.startsWith('### ')) {
         flushList();
-        elements.push(
-          <h3 key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(4)) }} />
-        );
+        elements.push(<h3 key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(4)) }} />);
         continue;
       }
       if (trimmed.startsWith('## ')) {
         flushList();
-        elements.push(
-          <h2 key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(3)) }} />
-        );
+        elements.push(<h2 key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(3)) }} />);
         continue;
       }
       if (trimmed.startsWith('# ')) {
         flushList();
-        elements.push(
-          <h1 key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />
-        );
+        elements.push(<h1 key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />);
         continue;
       }
-
-      // Blockquote
       if (trimmed.startsWith('> ')) {
         flushList();
-        elements.push(
-          <blockquote key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />
-        );
+        elements.push(<blockquote key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed.slice(2)) }} />);
         continue;
       }
-
-      // List items
       if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
         listOrdered = false;
         listItems.push(trimmed.slice(2));
@@ -168,114 +147,138 @@ export default function LessonPage() {
         listItems.push(trimmed.replace(/^\d+\.\s/, ''));
         continue;
       }
-
-      // Paragraph
       flushList();
-      elements.push(
-        <p key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed) }} />
-      );
+      elements.push(<p key={elements.length} dangerouslySetInnerHTML={{ __html: formatInline(trimmed) }} />);
     }
     flushList();
     return elements;
   };
 
-  return (
-    <div className="page" style={{ paddingBottom: '120px' }}>
-      {/* XP Popup */}
-      {showXP && <XPPopup amount={xpAmount} onComplete={() => setShowXP(false)} />}
+  const isCompleted = status === 'completed';
 
-      {/* Level Up Modal */}
+  return (
+    <div className="page" style={{ paddingBottom: '130px' }}>
+      {showXP && <XPPopup amount={xpAmount} onComplete={() => setShowXP(false)} />}
       {showLevelUp && <LevelUpModal level={levelUpValue} onClose={() => setShowLevelUp(false)} />}
 
-      {/* Header */}
+      {/* ── Header ── */}
       <div className="page-header">
-        <button className="page-back-btn" onClick={() => navigate('/learn')}>←</button>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+        <button className="page-back-btn" id="lesson-back-btn" onClick={() => navigate('/learn')}>←</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginBottom: '3px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
             {module.icon} {module.title}
           </p>
-          <h1 style={{ fontSize: '1.15rem', fontWeight: 700 }}>{lesson.title}</h1>
+          <h1 style={{ fontSize: '1.05rem', fontWeight: 700, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {lesson.title}
+          </h1>
         </div>
-        {status === 'completed' && (
-          <span className="badge badge-success">✅ Done</span>
+        {isCompleted && (
+          <span className="badge badge-success" style={{ flexShrink: 0 }}>✅ Done</span>
         )}
       </div>
 
-      {/* XP Reward Banner */}
+      {/* ── XP Reward Banner ── */}
       <div className="animate-fadeInUp" style={{
-        background: 'linear-gradient(135deg, rgba(108, 92, 231, 0.15), rgba(0, 206, 201, 0.1))',
-        border: '1px solid rgba(108, 92, 231, 0.2)',
+        background: isCompleted
+          ? 'linear-gradient(135deg, rgba(39,174,96,0.12), rgba(39,174,96,0.06))'
+          : 'linear-gradient(135deg, rgba(245,197,24,0.1), rgba(230,126,34,0.06))',
+        border: `1px solid ${isCompleted ? 'rgba(39,174,96,0.25)' : 'rgba(245,197,24,0.2)'}`,
         borderRadius: '14px',
         padding: '12px 16px',
-        marginBottom: '20px',
+        marginBottom: '16px',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
       }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
-          Lesson Reward
-        </span>
-        <span className="badge badge-xp" style={{ fontSize: '0.85rem' }}>
-          ⚡ +{lesson.xp_reward} XP
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1.2rem' }}>{isCompleted ? '🏅' : '⚡'}</span>
+          <div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {isCompleted ? 'Reward Earned' : 'Lesson Reward'}
+            </p>
+            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: isCompleted ? 'var(--color-success)' : 'var(--color-text-primary)' }}>
+              {isCompleted ? 'Completed!' : `Complete to earn XP`}
+            </p>
+          </div>
+        </div>
+        <span className={`badge ${isCompleted ? 'badge-success' : 'badge-xp'}`} style={{ fontSize: '0.85rem' }}>
+          +{lesson.xp_reward} XP
         </span>
       </div>
 
-      {/* Video Embed */}
+      {/* ── Video Embed ── */}
       {lesson.video_url && (
         <div className="animate-fadeInUp delay-100" style={{
-          borderRadius: '16px',
+          borderRadius: '18px',
           overflow: 'hidden',
-          marginBottom: '20px',
-          border: '1px solid var(--color-border)',
+          marginBottom: '16px',
+          border: '1px solid var(--color-border-gold)',
+          position: 'relative',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         }}>
+          {/* Top accent line */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: '2px', zIndex: 1,
+            background: 'linear-gradient(90deg, transparent, var(--color-accent-primary), transparent)',
+          }} />
           <iframe
             src={lesson.video_url}
-            style={{ width: '100%', aspectRatio: '16/9', border: 'none' }}
+            style={{ width: '100%', aspectRatio: '16/9', border: 'none', display: 'block' }}
             allowFullScreen
             title={lesson.title}
           />
         </div>
       )}
 
-      {/* Lesson Content */}
-      <div className="lesson-content animate-fadeInUp delay-200" style={{
-        background: 'var(--color-bg-card)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '16px',
-        padding: '20px',
-        marginBottom: '20px',
-      }}>
+      {/* ── Lesson Content ── */}
+      <div
+        className="lesson-content animate-fadeInUp delay-200"
+        style={{
+          background: 'var(--color-bg-card)',
+          border: '1px solid var(--color-border)',
+          borderRadius: '18px',
+          padding: '24px 20px',
+          marginBottom: '16px',
+        }}
+      >
         {renderContent(lesson.content)}
       </div>
 
-      {/* Complete Button */}
+      {/* ── Complete Button (fixed bottom) ── */}
       <div style={{
         position: 'fixed',
-        bottom: '0',
-        left: '0',
-        right: '0',
-        padding: '16px',
+        bottom: 0, left: 0, right: 0,
+        padding: '16px 16px',
         paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-        background: 'linear-gradient(to top, var(--color-bg-primary) 60%, transparent)',
+        background: 'linear-gradient(to top, var(--color-bg-primary) 65%, transparent)',
         zIndex: 50,
       }}>
         <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-          {status === 'completed' ? (
+          {isCompleted ? (
             <button
               className="btn btn-secondary btn-lg"
+              id="back-to-lessons-btn"
               onClick={() => navigate('/learn')}
               style={{ width: '100%' }}
             >
-              ✅ Completed — Back to Lessons
+              ← Back to Lessons
             </button>
           ) : (
             <button
               className="btn btn-primary btn-lg animate-glow"
+              id="complete-lesson-btn"
               onClick={handleComplete}
               disabled={completing}
-              style={{ width: '100%' }}
+              style={{ width: '100%', opacity: completing ? 0.8 : 1 }}
             >
-              {completing ? '🎉 Completing...' : '🎯 Mark as Completed'}
+              {completing ? (
+                <>
+                  <span className="animate-spin" style={{ display: 'inline-block' }}>⭐</span>
+                  Marking Complete…
+                </>
+              ) : (
+                '🎯 Mark as Complete'
+              )}
             </button>
           )}
         </div>
