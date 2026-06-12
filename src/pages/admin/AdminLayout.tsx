@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
 const adminTabs = [
@@ -139,7 +139,15 @@ export default function AdminLayout() {
       </div>
 
       {/* Content */}
-      <Outlet />
+      <Suspense 
+        fallback={
+          <div style={{ textAlign: 'center', padding: '40px 0', fontSize: '0.8rem', color: 'var(--text-3)', fontFamily: 'var(--font-mono)' }}>
+            Loading component...
+          </div>
+        }
+      >
+        <Outlet />
+      </Suspense>
     </div>
   );
 }
