@@ -4,9 +4,6 @@ export interface User {
   username: string;
   first_name: string;
   avatar: string;
-  level: number;
-  xp: number;
-  streak: number;
   last_login: string;
   created_at: string;
   is_admin: boolean;
@@ -29,7 +26,6 @@ export interface Lesson {
   description: string;
   content: string;
   thumbnail: string;
-  xp_reward: number;
   order: number;
   video_url?: string;
   pdf_url?: string;
@@ -43,16 +39,9 @@ export interface LessonProgress {
   completed_at?: string;
 }
 
-export interface LevelThreshold {
-  level: number;
-  xp_required: number;
-  title: string;
-}
-
 export interface AppNotification {
   id: string;
-  type: 'xp_gain' | 'level_up';
+  type: 'lesson_complete';
   message: string;
-  value?: number;
   timestamp: number;
 }

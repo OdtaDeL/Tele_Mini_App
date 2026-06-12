@@ -1,10 +1,10 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
 import type { User, Module, Lesson, LessonProgress, AppNotification } from '../types';
 import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS, MOCK_LEADERBOARD_USERS } from '../data/mockData';
-import { getLevelFromXP, generateId, isToday, isYesterday, XP_REWARDS } from '../utils/helpers';
+import { generateId, isToday, isYesterday } from '../utils/helpers';
 import { supabase } from '../services/supabase';
 
-// ===== State Shape =====
+// ===== State =====
 interface AppState {
   user: User;
   modules: Module[];
@@ -20,11 +20,9 @@ interface AppState {
 // ===== Actions =====
 type AppAction =
   | { type: 'SET_USER'; payload: User }
-  | { type: 'ADD_XP'; payload: number }
-  | { type: 'COMPLETE_LESSON'; payload: { lessonId: string; xpReward: number } }
+  | { type: 'COMPLETE_LESSON'; payload: { lessonId: string } }
   | { type: 'ADD_NOTIFICATION'; payload: AppNotification }
   | { type: 'DISMISS_NOTIFICATION'; payload: string }
-  | { type: 'UPDATE_STREAK' }
   | { type: 'LOAD_STATE'; payload: Partial<AppState> }
   // Admin actions
   | { type: 'ADMIN_ADD_MODULE'; payload: Module }
@@ -33,7 +31,6 @@ type AppAction =
   | { type: 'ADMIN_ADD_LESSON'; payload: Lesson }
   | { type: 'ADMIN_UPDATE_LESSON'; payload: Lesson }
   | { type: 'ADMIN_DELETE_LESSON'; payload: string }
-  | { type: 'ADMIN_GRANT_XP'; payload: { userId: string; amount: number } }
   | { type: 'ADMIN_BAN_USER'; payload: string };
 
 // ===== Initial State =====
@@ -52,21 +49,15 @@ const initialState: AppState = {
 // ===== Reducer =====
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+
     case 'SET_USER':
       return { ...state, user: action.payload };
 
-    case 'ADD_XP': {
-      const newXP = state.user.xp + action.payload;
-      const newLevel = getLevelFromXP(newXP);
-      return {
-        ...state,
-        user: { ...state.user, xp: newXP, level: newLevel },
-      };
-    }
-
     case 'COMPLETE_LESSON': {
-      const { lessonId, xpReward } = action.payload;
-      const existing = state.lessonProgress.find(p => p.lesson_id === lessonId && p.user_id === state.user.id);
+      const { lessonId } = action.payload;
+      const existing = state.lessonProgress.find(
+        p => p.lesson_id === lessonId && p.user_id === state.user.id
+      );
       if (existing?.status === 'completed') return state;
 
       const newProgress: LessonProgress = {
@@ -81,72 +72,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ? state.lessonProgress.map(p => p.id === existing.id ? newProgress : p)
         : [...state.lessonProgress, newProgress];
 
-      const newXP = state.user.xp + xpReward;
-
-      // Check if module is completed
-      const lesson = state.lessons.find(l => l.id === lessonId);
-      let moduleBonus = 0;
-      if (lesson) {
-        const moduleLessons = state.lessons.filter(l => l.module_id === lesson.module_id);
-        const completedInModule = updatedProgress.filter(
-          p => p.status === 'completed' && moduleLessons.some(ml => ml.id === p.lesson_id)
-        );
-        if (completedInModule.length === moduleLessons.length) {
-          moduleBonus = XP_REWARDS.COMPLETE_MODULE;
-        }
-      }
-
-      const totalXP = newXP + moduleBonus;
-      const finalLevel = getLevelFromXP(totalXP);
-
-      return {
-        ...state,
-        lessonProgress: updatedProgress,
-        user: { ...state.user, xp: totalXP, level: finalLevel },
-      };
+      return { ...state, lessonProgress: updatedProgress };
     }
-
 
     case 'ADD_NOTIFICATION':
-      return {
-        ...state,
-        notifications: [...state.notifications, action.payload],
-      };
+      return { ...state, notifications: [...state.notifications, action.payload] };
 
     case 'DISMISS_NOTIFICATION':
-      return {
-        ...state,
-        notifications: state.notifications.filter(n => n.id !== action.payload),
-      };
-
-    case 'UPDATE_STREAK': {
-      const { last_login, streak } = state.user;
-      let newStreak = streak;
-      if (isToday(last_login)) {
-        newStreak = streak;
-      } else if (isYesterday(last_login)) {
-        newStreak = streak + 1;
-      } else {
-        newStreak = 1;
-      }
-      return {
-        ...state,
-        user: { ...state.user, streak: newStreak, last_login: new Date().toISOString() },
-      };
-    }
+      return { ...state, notifications: state.notifications.filter(n => n.id !== action.payload) };
 
     case 'LOAD_STATE':
       return { ...state, ...action.payload };
 
-    // Admin actions
     case 'ADMIN_ADD_MODULE':
       return { ...state, modules: [...state.modules, action.payload] };
 
     case 'ADMIN_UPDATE_MODULE':
-      return {
-        ...state,
-        modules: state.modules.map(m => m.id === action.payload.id ? action.payload : m),
-      };
+      return { ...state, modules: state.modules.map(m => m.id === action.payload.id ? action.payload : m) };
 
     case 'ADMIN_DELETE_MODULE':
       return {
@@ -159,32 +101,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, lessons: [...state.lessons, action.payload] };
 
     case 'ADMIN_UPDATE_LESSON':
-      return {
-        ...state,
-        lessons: state.lessons.map(l => l.id === action.payload.id ? action.payload : l),
-      };
+      return { ...state, lessons: state.lessons.map(l => l.id === action.payload.id ? action.payload : l) };
 
     case 'ADMIN_DELETE_LESSON':
-      return {
-        ...state,
-        lessons: state.lessons.filter(l => l.id !== action.payload),
-      };
-
-    case 'ADMIN_GRANT_XP': {
-      const { userId, amount } = action.payload;
-      if (userId === state.user.id) {
-        const newXP = Math.max(0, state.user.xp + amount);
-        return { ...state, user: { ...state.user, xp: newXP, level: getLevelFromXP(newXP) } };
-      }
-      return {
-        ...state,
-        leaderboardUsers: state.leaderboardUsers.map(u =>
-          u.id === userId
-            ? { ...u, xp: Math.max(0, u.xp + amount), level: getLevelFromXP(Math.max(0, u.xp + amount)) }
-            : u
-        ),
-      };
-    }
+      return { ...state, lessons: state.lessons.filter(l => l.id !== action.payload) };
 
     case 'ADMIN_BAN_USER':
       return {
@@ -193,7 +113,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
           u.id === action.payload ? { ...u, is_banned: !u.is_banned } : u
         ),
       };
-
 
     default:
       return state;
@@ -204,34 +123,33 @@ function appReducer(state: AppState, action: AppAction): AppState {
 interface AppContextValue {
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
-  // Derived helpers
   getModuleProgress: (moduleId: string) => number;
   getLessonStatus: (lessonId: string) => 'not_started' | 'in_progress' | 'completed';
   getCompletedLessonsCount: () => number;
   getCompletedModulesCount: () => number;
-  getCurrentStreak: () => number;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-// ===== Provider =====
-// Helper to get active storage key based on Telegram user ID
+// ===== Storage key =====
 const getStorageKey = (): string => {
   const tg = window.Telegram?.WebApp;
   const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
-  return tgUserId ? `academy_hub_state_tg_v4_${tgUserId}` : 'academy_hub_state_v4';
+  return tgUserId ? `academy_hub_v5_${tgUserId}` : 'academy_hub_v5';
 };
 
+// ===== Provider =====
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState, (initial) => {
     const tg = window.Telegram?.WebApp;
     const hasInitData = !!tg?.initData;
     let result = { ...initial };
+
     try {
       const tgUserId = tg?.initDataUnsafe?.user?.id?.toString();
-      const actualKey = tgUserId ? `academy_hub_state_tg_v4_${tgUserId}` : 'academy_hub_state_v4';
-      
-      const saved = localStorage.getItem(actualKey);
+      const key = tgUserId ? `academy_hub_v5_${tgUserId}` : 'academy_hub_v5';
+      const saved = localStorage.getItem(key);
+
       if (saved) {
         const parsed = JSON.parse(saved);
         result = {
@@ -242,7 +160,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           lessons: parsed.lessons || initial.lessons,
         };
       } else if (tgUserId) {
-        // Initialize new Telegram user session
         result = {
           ...initial,
           user: {
@@ -251,41 +168,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
             telegram_id: tgUserId,
             first_name: tg?.initDataUnsafe?.user?.first_name || 'Trader',
             username: tg?.initDataUnsafe?.user?.username || 'telegram_user',
-          }
+          },
         };
       }
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
+
     return {
       ...result,
-      isMember: !hasInitData, // Bypass check for local development
+      isMember: !hasInitData,
       isCheckingMembership: hasInitData,
     };
   });
 
   const isLoadedRef = useRef(false);
   const persistedProgressIds = useRef<Set<string>>(new Set());
-  const lastSavedUser = useRef<{ xp: number; level: number; streak: number; is_admin: boolean; last_login: string } | null>(null);
+  const lastSavedUser = useRef<{ last_login: string; is_admin: boolean } | null>(null);
   const lastSavedLeaderboardUsers = useRef<User[] | null>(null);
 
-  // Sync state to local storage as fallback cache
+  // Persist to localStorage
   useEffect(() => {
-    const actualKey = getStorageKey();
-    const toSave = {
+    const key = getStorageKey();
+    localStorage.setItem(key, JSON.stringify({
       user: state.user,
       lessonProgress: state.lessonProgress,
       modules: state.modules,
       lessons: state.lessons,
-    };
-    localStorage.setItem(actualKey, JSON.stringify(toSave));
+    }));
   }, [state.user, state.lessonProgress, state.modules, state.lessons]);
 
-  // Sync Telegram user, bootstrap Supabase data and verify Admin role
+  // Bootstrap from Supabase
   useEffect(() => {
-    const bootstrapUser = async () => {
+    const bootstrap = async () => {
       const tg = window.Telegram?.WebApp;
-      let telegramId = '123456789'; // Default fallback
+      let telegramId = '123456789';
       let firstName = 'Trader';
       let username = 'trader_user';
 
@@ -295,45 +210,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
         username = tg.initDataUnsafe.user.username || 'telegram_user';
       }
 
-      const GROUP_CHAT_ID = '-1003872191165'; // Academy group chat ID
+      const GROUP_CHAT_ID = '-1003872191165';
 
       try {
-        // 1. Fetch check-admin and check-membership status first
         let isAdmin = false;
         let isMember = true;
+
         if (tg?.initData) {
           try {
-            const response = await fetch('/api/check-admin', {
+            const res = await fetch('/api/check-admin', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                telegramId,
-                groupId: GROUP_CHAT_ID,
-                initData: tg.initData,
-              }),
+              body: JSON.stringify({ telegramId, groupId: GROUP_CHAT_ID, initData: tg.initData }),
             });
-            const data = await response.json();
+            const data = await res.json();
             isAdmin = data?.isAdmin || false;
             isMember = data?.isMember ?? true;
           } catch (err) {
-            console.error('Admin/membership verification check failed:', err);
+            console.error('Membership check failed:', err);
           }
         }
 
-        // If not a member, immediately lock the app and stop execution
         if (!isMember) {
-          dispatch({
-            type: 'LOAD_STATE',
-            payload: {
-              isMember: false,
-              isCheckingMembership: false,
-            }
-          });
+          dispatch({ type: 'LOAD_STATE', payload: { isMember: false, isCheckingMembership: false } });
           isLoadedRef.current = true;
           return;
         }
 
-        // 2. Fetch or create user in Supabase users table
+        // Upsert user in Supabase (no xp/level/streak fields)
         let dbUser = null;
         const { data: existingUsers, error: fetchErr } = await supabase
           .from('users')
@@ -344,78 +248,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (existingUsers && existingUsers.length > 0) {
           dbUser = existingUsers[0];
-          // Update admin status if it has changed
           if (dbUser.is_admin !== isAdmin) {
             const { data: updated } = await supabase
               .from('users')
               .update({ is_admin: isAdmin })
               .eq('id', dbUser.id)
               .select();
-            if (updated && updated.length > 0) {
-              dbUser = updated[0];
-            }
+            if (updated?.length) dbUser = updated[0];
           }
         } else {
-          // Create new user record
           const { data: inserted, error: insertErr } = await supabase
             .from('users')
             .insert({
               telegram_id: telegramId,
               first_name: firstName,
-              username: username,
-              level: 1,
-              xp: 0,
-              streak: 1,
+              username,
               is_admin: isAdmin,
               last_login: new Date().toISOString(),
             })
             .select();
-
           if (insertErr) throw insertErr;
-          if (inserted && inserted.length > 0) {
-            dbUser = inserted[0];
-          }
+          if (inserted?.length) dbUser = inserted[0];
         }
 
-        if (!dbUser) throw new Error('Failed to resolve user from database');
+        if (!dbUser) throw new Error('Failed to resolve user');
 
-        // 3. Fetch relational progress data and all users from Supabase
         const [progressRes, usersRes] = await Promise.all([
           supabase.from('lesson_progress').select('*').eq('user_id', dbUser.id),
-          supabase.from('users').select('*')
+          supabase.from('users').select('*'),
         ]);
 
         const lessonProgress = progressRes.data || [];
         const allUsers = usersRes.data || [];
+        const leaderboardUsers = allUsers
+          .filter(u => u.id !== dbUser.id)
+          .map(u => ({
+            id: u.id,
+            telegram_id: u.telegram_id,
+            username: u.username || 'telegram_user',
+            first_name: u.first_name || 'Trader',
+            avatar: u.avatar || '',
+            last_login: u.last_login || new Date().toISOString(),
+            created_at: u.created_at || new Date().toISOString(),
+            is_admin: u.is_admin || false,
+            is_banned: u.is_banned || false,
+          }));
 
-        // Filter out current user from leaderboardUsers to avoid duplicate rendering
-        const leaderboardUsers = allUsers.filter(u => u.id !== dbUser.id).map(u => ({
-          id: u.id,
-          telegram_id: u.telegram_id,
-          username: u.username || 'telegram_user',
-          first_name: u.first_name || 'Trader',
-          avatar: u.avatar || '',
-          level: u.level || 1,
-          xp: u.xp || 0,
-          streak: u.streak || 0,
-          last_login: u.last_login || new Date().toISOString(),
-          created_at: u.created_at || new Date().toISOString(),
-          is_admin: u.is_admin || false,
-          is_banned: u.is_banned || false
-        }));
-
-        // 4. Update local tracking refs to prevent re-writes on load
         lessonProgress.forEach(p => persistedProgressIds.current.add(p.id));
-        lastSavedUser.current = {
-          xp: dbUser.xp,
-          level: dbUser.level,
-          streak: dbUser.streak,
-          is_admin: dbUser.is_admin,
-          last_login: dbUser.last_login
-        };
+        lastSavedUser.current = { last_login: dbUser.last_login, is_admin: dbUser.is_admin };
         lastSavedLeaderboardUsers.current = leaderboardUsers.map(u => ({ ...u }));
 
-        // 5. Load state to context
         dispatch({
           type: 'LOAD_STATE',
           payload: {
@@ -425,15 +307,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
               first_name: dbUser.first_name,
               username: dbUser.username,
               avatar: dbUser.avatar || '',
-              level: dbUser.level,
-              xp: dbUser.xp,
-              streak: dbUser.streak,
               last_login: dbUser.last_login,
               created_at: dbUser.created_at,
               is_admin: dbUser.is_admin,
-              is_banned: dbUser.is_banned
+              is_banned: dbUser.is_banned,
             },
-            leaderboardUsers: leaderboardUsers,
+            leaderboardUsers,
             isMember: true,
             isCheckingMembership: false,
             lessonProgress: lessonProgress.map(p => ({
@@ -441,39 +320,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
               user_id: p.user_id,
               lesson_id: p.lesson_id,
               status: p.status,
-              completed_at: p.completed_at
-            }))
-          }
+              completed_at: p.completed_at,
+            })),
+          },
         });
-
-        // Trigger streak update on mount locally as well
-        dispatch({ type: 'UPDATE_STREAK' });
 
         isLoadedRef.current = true;
       } catch (err) {
-        console.error('Supabase synchronization bootstrap failed:', err);
-        // Fallback: update local streak and let user play locally
-        dispatch({ type: 'UPDATE_STREAK' });
-        dispatch({
-          type: 'LOAD_STATE',
-          payload: {
-            isCheckingMembership: false,
-          }
-        });
+        console.error('Supabase bootstrap failed:', err);
+        dispatch({ type: 'LOAD_STATE', payload: { isCheckingMembership: false } });
         isLoadedRef.current = true;
       }
     };
 
-    bootstrapUser();
+    bootstrap();
   }, []);
 
-  // Sync changes back to Supabase in the background
+  // Sync changes back to Supabase
   useEffect(() => {
     if (!isLoadedRef.current) return;
 
-    const syncToDatabase = async () => {
-      // 1. Sync new lesson progress
-      const newProgress = state.lessonProgress.filter((p: LessonProgress) => !persistedProgressIds.current.has(p.id));
+    const sync = async () => {
+      // Sync new lesson progress
+      const newProgress = state.lessonProgress.filter(p => !persistedProgressIds.current.has(p.id));
       for (const progress of newProgress) {
         try {
           const { error } = await supabase.from('lesson_progress').insert({
@@ -481,91 +350,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
             user_id: state.user.id,
             lesson_id: progress.lesson_id,
             status: progress.status,
-            completed_at: progress.completed_at
+            completed_at: progress.completed_at,
           });
           if (!error) persistedProgressIds.current.add(progress.id);
         } catch (err) {
-          console.error('Failed to sync lesson progress:', err);
+          console.error('Failed to sync progress:', err);
         }
       }
 
-
-      // 4. Sync user profile changes (XP, Level, Streak)
+      // Sync user last_login
       const u = state.user;
       const last = lastSavedUser.current;
-      if (last && (u.xp !== last.xp || u.level !== last.level || u.streak !== last.streak || u.last_login !== last.last_login)) {
+      if (last && u.last_login !== last.last_login) {
         try {
-          const { error } = await supabase
-            .from('users')
-            .update({
-              xp: u.xp,
-              level: u.level,
-              streak: u.streak,
-              last_login: u.last_login
-            })
-            .eq('id', u.id);
-          if (!error) {
-            lastSavedUser.current = {
-              xp: u.xp,
-              level: u.level,
-              streak: u.streak,
-              is_admin: u.is_admin,
-              last_login: u.last_login
-            };
-          }
+          await supabase.from('users').update({ last_login: u.last_login }).eq('id', u.id);
+          lastSavedUser.current = { last_login: u.last_login, is_admin: u.is_admin };
         } catch (err) {
-          console.error('Failed to sync user profile:', err);
+          console.error('Failed to sync user:', err);
         }
       }
 
-      // 5. Sync other users' changes (from Admin Panel edits like XP grant or bans)
+      // Sync ban status changes from admin panel
       if (lastSavedLeaderboardUsers.current) {
         for (const user of state.leaderboardUsers) {
           const last = lastSavedLeaderboardUsers.current.find(lu => lu.id === user.id);
-          if (last && (user.xp !== last.xp || user.level !== last.level || user.is_banned !== last.is_banned)) {
+          if (last && user.is_banned !== last.is_banned) {
             try {
-              await supabase
-                .from('users')
-                .update({
-                  xp: user.xp,
-                  level: user.level,
-                  is_banned: user.is_banned
-                })
-                .eq('id', user.id);
+              await supabase.from('users').update({ is_banned: user.is_banned }).eq('id', user.id);
             } catch (err) {
-              console.error('Failed to sync other user changes from admin:', err);
+              console.error('Failed to sync ban status:', err);
             }
           }
         }
+        lastSavedLeaderboardUsers.current = state.leaderboardUsers.map(u => ({ ...u }));
       }
-      lastSavedLeaderboardUsers.current = state.leaderboardUsers.map(lu => ({ ...lu }));
     };
 
-    syncToDatabase();
+    sync();
   }, [state.user, state.lessonProgress, state.leaderboardUsers]);
 
-  // Helpers
+  // ===== Helpers =====
   const getModuleProgress = (moduleId: string): number => {
-    const moduleLessons = state.lessons.filter((l: Lesson) => l.module_id === moduleId);
-    if (moduleLessons.length === 0) return 0;
+    const moduleLessons = state.lessons.filter(l => l.module_id === moduleId);
+    if (!moduleLessons.length) return 0;
     const completed = state.lessonProgress.filter(
-      (p: LessonProgress) => p.status === 'completed' && moduleLessons.some((ml: Lesson) => ml.id === p.lesson_id)
+      p => p.status === 'completed' && moduleLessons.some(ml => ml.id === p.lesson_id)
     );
     return Math.round((completed.length / moduleLessons.length) * 100);
   };
 
   const getLessonStatus = (lessonId: string): 'not_started' | 'in_progress' | 'completed' => {
     const progress = state.lessonProgress.find(
-      (p: LessonProgress) => p.lesson_id === lessonId && p.user_id === state.user.id
+      p => p.lesson_id === lessonId && p.user_id === state.user.id
     );
     return progress?.status || 'not_started';
   };
 
-  const getCompletedLessonsCount = (): number => {
-    return state.lessonProgress.filter(
-      (p: LessonProgress) => p.status === 'completed' && p.user_id === state.user.id
-    ).length;
-  };
+  const getCompletedLessonsCount = (): number =>
+    state.lessonProgress.filter(p => p.status === 'completed' && p.user_id === state.user.id).length;
 
   const getCompletedModulesCount = (): number => {
     let count = 0;
@@ -575,27 +417,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return count;
   };
 
-  const getCurrentStreak = (): number => {
-    return state.user.streak;
-  };
-
-  const value: AppContextValue = {
-    state,
-    dispatch,
-    getModuleProgress,
-    getLessonStatus,
-    getCompletedLessonsCount,
-    getCompletedModulesCount,
-    getCurrentStreak,
-  };
-
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={{ state, dispatch, getModuleProgress, getLessonStatus, getCompletedLessonsCount, getCompletedModulesCount }}>
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 export function useApp(): AppContextValue {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within AppProvider');
-  }
+  if (!context) throw new Error('useApp must be used within AppProvider');
   return context;
 }
