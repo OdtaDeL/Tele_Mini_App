@@ -141,3 +141,24 @@ export async function syncLessonProgress(userId: string, progress: any) {
     throw error;
   }
 }
+
+export async function uploadFile(bucketName: string, file: File, folder?: string): Promise<string> {
+  const fileExt = file.name.split('.').pop();
+  const randomName = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+  const filePath = folder ? `${folder}/${randomName}` : randomName;
+  
+  const { error } = await supabase.storage
+    .from(bucketName)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (error) throw error;
+
+  const { data: { publicUrl } } = supabase.storage
+    .from(bucketName)
+    .getPublicUrl(filePath);
+
+  return publicUrl;
+}

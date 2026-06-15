@@ -1,13 +1,54 @@
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { useApp } from '../../context/AppContext';
 import { generateId } from '../../utils/helpers';
 import type { Lesson } from '../../types';
+import * as dbService from '../../services/dbService';
 
 export default function LessonManager() {
   const { state, dispatch } = useApp();
   const [editing, setEditing] = useState<Lesson | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [filterModule, setFilterModule] = useState<string>('all');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [isUploadingContent, setIsUploadingContent] = useState(false);
+
+  const handleThumbnailUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadError('');
+    try {
+      const url = await dbService.uploadFile('lessons', file, 'vertex');
+      setForm(prev => ({ ...prev, thumbnail: url }));
+    } catch (err: any) {
+      console.error(err);
+      setUploadError(err.message || 'Failed to upload image. Please ensure you have created a public bucket named "lessons" in Supabase Storage.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleContentImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingContent(true);
+    try {
+      const url = await dbService.uploadFile('lessons', file, 'vertex');
+      // Append markdown image to content
+      setForm(prev => ({
+        ...prev,
+        content: prev.content + `\n![Image](${url})\n`
+      }));
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Upload failed. Check if public storage bucket "lessons" is created.');
+    } finally {
+      setIsUploadingContent(false);
+    }
+  };
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -154,19 +195,91 @@ export default function LessonManager() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Short Description"
             />
-            <input
-              className="input"
-              value={form.thumbnail}
-              onChange={(e) => setForm({ ...form, thumbnail: e.target.value })}
-              placeholder="Thumbnail / Header Image URL (optional)"
-            />
-            <textarea
-              className="input textarea"
-              value={form.content}
-              onChange={(e) => setForm({ ...form, content: e.target.value })}
-              placeholder="Lesson Content (Markdown supported)"
-              style={{ minHeight: '120px' }}
-            />
+            {/* Thumbnail Upload & Preview */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-2)' }}>
+                Thumbnail / Header Image
+              </label>
+              
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleThumbnailUpload}
+                  style={{ display: 'none' }}
+                  id="thumbnail-upload-input"
+                  disabled={isUploading}
+                />
+                <label
+                  htmlFor="thumbnail-upload-input"
+                  className="btn btn-secondary btn-sm"
+                  style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  {isUploading ? '📤 Uploading...' : '📁 Choose File'}
+                </label>
+                
+                {form.thumbnail && (
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-sm"
+                    onClick={() => setForm(prev => ({ ...prev, thumbnail: '' }))}
+                  >
+                    🗑 Remove
+                  </button>
+                )}
+              </div>
+
+              {uploadError && (
+                <p style={{ fontSize: '0.7rem', color: 'var(--red)', margin: 0 }}>
+                  {uploadError}
+                </p>
+              )}
+
+              {form.thumbnail && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', maxWidth: '180px', marginTop: '4px' }}>
+                  <img src={form.thumbnail} alt="Preview" style={{ width: '100%', height: 'auto', display: 'block' }} />
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-2)' }}>
+                  Lesson Content (Markdown)
+                </label>
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleContentImageUpload}
+                    style={{ display: 'none' }}
+                    id="content-image-upload"
+                    disabled={isUploadingContent}
+                  />
+                  <label
+                    htmlFor="content-image-upload"
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: 'var(--gold-bright)',
+                      cursor: 'pointer',
+                      border: '1px solid rgba(201, 162, 39, 0.3)',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      background: 'rgba(201, 162, 39, 0.05)',
+                    }}
+                  >
+                    {isUploadingContent ? 'Uploading...' : '🖼️ Insert Image'}
+                  </label>
+                </div>
+              </div>
+              <textarea
+                className="input textarea"
+                value={form.content}
+                onChange={(e) => setForm({ ...form, content: e.target.value })}
+                placeholder="Lesson Content (Markdown supported)"
+                style={{ minHeight: '120px' }}
+              />
+            </div>
             {/* Dynamic Videos Input */}
             <div style={{ marginTop: '4px', marginBottom: '4px' }}>
               <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>
