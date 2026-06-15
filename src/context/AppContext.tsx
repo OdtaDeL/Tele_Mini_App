@@ -1,6 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef, type ReactNode } from 'react';
 import type { User, Module, Lesson, LessonProgress, AppNotification } from '../types';
-import { MOCK_USER, MOCK_MODULES, MOCK_LESSONS } from '../data/mockData';
 import { generateId } from '../utils/helpers';
 import * as dbService from '../services/dbService';
 
@@ -34,9 +33,21 @@ type AppAction =
   | { type: 'ADMIN_DELETE_LESSON'; payload: string }
   | { type: 'ADMIN_BAN_USER'; payload: string };
 
+const defaultUser: User = {
+  id: '',
+  telegram_id: '',
+  username: '',
+  first_name: 'Guest',
+  avatar: '',
+  last_login: new Date().toISOString(),
+  created_at: new Date().toISOString(),
+  is_admin: false,
+  is_banned: false,
+};
+
 // ===== Initial State =====
 const initialState: AppState = {
-  user: MOCK_USER,
+  user: defaultUser,
   modules: [],
   lessons: [],
   lessonProgress: [],
@@ -289,8 +300,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const lessonProgress = progressRes || [];
         const allUsers = usersRes || [];
 
-        // ── Resolve modules (seed from mockData if empty) ──
-        let dbModules: Module[] = modulesRes.map(m => ({
+        // ── Resolve modules from Supabase ──
+        const dbModules: Module[] = modulesRes.map(m => ({
           id: m.id,
           title: m.title,
           description: m.description || '',
@@ -299,16 +310,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           lessons_count: 0,
         }));
 
-        if (dbModules.length === 0) {
-          console.log('No modules in Supabase — seeding from mockData…');
-          for (const mod of MOCK_MODULES) {
-            await dbService.upsertModule(mod);
-            dbModules.push(mod);
-          }
-        }
-
-        // ── Resolve lessons (seed from mockData if empty) ──
-        let dbLessons: Lesson[] = lessonsRes.map(l => ({
+        // ── Resolve lessons from Supabase ──
+        const dbLessons: Lesson[] = lessonsRes.map(l => ({
           id: l.id,
           module_id: l.module_id,
           title: l.title,
@@ -319,14 +322,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           video_url: l.video_url || undefined,
           pdf_url: undefined,
         }));
-
-        if (dbLessons.length === 0) {
-          console.log('No lessons in Supabase — seeding from mockData…');
-          for (const lesson of MOCK_LESSONS) {
-            await dbService.upsertLesson(lesson);
-            dbLessons.push(lesson);
-          }
-        }
 
         // ── Track persisted IDs and positions for diffing ──
         lessonProgress.forEach(p => {

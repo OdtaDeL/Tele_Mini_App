@@ -1,4 +1,4 @@
-import { lazy, useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
 import BottomNav from './components/BottomNav';
@@ -8,11 +8,11 @@ import LessonPage from './pages/LessonPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminLayout from './pages/admin/AdminLayout';
 
-// Lazy load admin pages
-const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const ModuleManager = lazy(() => import('./pages/admin/ModuleManager'));
-const LessonManager = lazy(() => import('./pages/admin/LessonManager'));
-const UserManager = lazy(() => import('./pages/admin/UserManager'));
+// Admin pages
+import AdminDashboard from './pages/admin/AdminDashboard';
+import ModuleManager from './pages/admin/ModuleManager';
+import LessonManager from './pages/admin/LessonManager';
+import UserManager from './pages/admin/UserManager';
 
 function AppContent() {
   const { state } = useApp();
