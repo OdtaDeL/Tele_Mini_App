@@ -13,7 +13,7 @@ export default function LessonManager() {
     description: '',
     content: '',
     module_id: '',
-    video_url: '',
+    videos: [{ title: '', url: '' }] as { title: string; url: string }[],
   });
 
   const filteredLessons = filterModule === 'all'
@@ -22,6 +22,9 @@ export default function LessonManager() {
 
   const handleSubmit = () => {
     if (!form.title.trim() || !form.module_id) return;
+
+    const activeVideos = form.videos.filter(v => v.url.trim() !== '');
+    const videoUrlValue = activeVideos.length > 0 ? JSON.stringify(activeVideos) : undefined;
 
     if (editing) {
       dispatch({
@@ -32,7 +35,7 @@ export default function LessonManager() {
           description: form.description,
           content: form.content,
           module_id: form.module_id,
-          video_url: form.video_url || undefined,
+          video_url: videoUrlValue,
         },
       });
     } else {
@@ -45,7 +48,7 @@ export default function LessonManager() {
         module_id: form.module_id,
         thumbnail: '',
         order: moduleLessons.length + 1,
-        video_url: form.video_url || undefined,
+        video_url: videoUrlValue,
       };
       dispatch({ type: 'ADMIN_ADD_LESSON', payload: newLesson });
     }
@@ -54,19 +57,34 @@ export default function LessonManager() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', description: '', content: '', module_id: '', video_url: '' });
+    setForm({ title: '', description: '', content: '', module_id: '', videos: [{ title: '', url: '' }] });
     setEditing(null);
     setShowForm(false);
   };
 
   const handleEdit = (lesson: Lesson) => {
     setEditing(lesson);
+    
+    let parsedVideos: { title: string; url: string }[] = [{ title: '', url: '' }];
+    if (lesson.video_url) {
+      try {
+        const parsed = JSON.parse(lesson.video_url);
+        if (Array.isArray(parsed)) {
+          parsedVideos = parsed.map(v => ({ title: v.title || '', url: v.url || '' }));
+        } else {
+          parsedVideos = [{ title: '', url: lesson.video_url }];
+        }
+      } catch {
+        parsedVideos = [{ title: '', url: lesson.video_url }];
+      }
+    }
+
     setForm({
       title: lesson.title,
       description: lesson.description,
       content: lesson.content,
       module_id: lesson.module_id,
-      video_url: lesson.video_url || '',
+      videos: parsedVideos,
     });
     setShowForm(true);
   };
@@ -140,12 +158,59 @@ export default function LessonManager() {
               placeholder="Lesson Content (Markdown supported)"
               style={{ minHeight: '120px' }}
             />
-            <input
-              className="input"
-              value={form.video_url}
-              onChange={(e) => setForm({ ...form, video_url: e.target.value })}
-              placeholder="Video Embed URL (optional)"
-            />
+            {/* Dynamic Videos Input */}
+            <div style={{ marginTop: '4px', marginBottom: '4px' }}>
+              <label style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: '8px' }}>
+                Videos ({form.videos.length})
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {form.videos.map((vid, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      className="input"
+                      style={{ flex: 1, minWidth: '80px' }}
+                      value={vid.title}
+                      onChange={(e) => {
+                        const newVids = [...form.videos];
+                        newVids[idx].title = e.target.value;
+                        setForm({ ...form, videos: newVids });
+                      }}
+                      placeholder={`Title ${idx + 1} (e.g. Part 1)`}
+                    />
+                    <input
+                      className="input"
+                      style={{ flex: 2 }}
+                      value={vid.url}
+                      onChange={(e) => {
+                        const newVids = [...form.videos];
+                        newVids[idx].url = e.target.value;
+                        setForm({ ...form, videos: newVids });
+                      }}
+                      placeholder="Video URL"
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      style={{ padding: '8px 12px', flexShrink: 0 }}
+                      onClick={() => {
+                        const newVids = form.videos.filter((_, i) => i !== idx);
+                        setForm({ ...form, videos: newVids.length > 0 ? newVids : [{ title: '', url: '' }] });
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ marginTop: '8px', width: '100%', border: '1px dashed var(--border-gold)' }}
+                onClick={() => setForm({ ...form, videos: [...form.videos, { title: '', url: '' }] })}
+              >
+                ➕ Add Video
+              </button>
+            </div>
             <button className="btn btn-primary" onClick={handleSubmit}>
               {editing ? 'Save Changes' : 'Create Lesson'}
             </button>
@@ -157,13 +222,26 @@ export default function LessonManager() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {[...filteredLessons].sort((a, b) => a.order - b.order).map((lesson) => {
           const mod = state.modules.find(m => m.id === lesson.module_id);
+          
+          const getVideosCountStr = (videoUrl: string | undefined): string => {
+            if (!videoUrl) return '';
+            try {
+              const parsed = JSON.parse(videoUrl);
+              if (Array.isArray(parsed)) {
+                const count = parsed.filter(v => v.url).length;
+                return count > 0 ? ` · ${count} Video${count > 1 ? 's' : ''}` : '';
+              }
+            } catch { /* ignore */ }
+            return ' · Video';
+          };
+
           return (
             <div key={lesson.id} className="admin-card" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-1)' }}>{lesson.title}</p>
                 <p style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: 2 }}>
                   {mod?.icon} {mod?.title}
-                  {lesson.video_url && <span style={{ marginLeft: 8, color: 'var(--gold-bright)' }}>· Video</span>}
+                  {lesson.video_url && <span style={{ marginLeft: 8, color: 'var(--gold-bright)' }}>{getVideosCountStr(lesson.video_url)}</span>}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>

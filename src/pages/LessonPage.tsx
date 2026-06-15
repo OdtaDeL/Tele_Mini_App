@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { generateId } from '../utils/helpers';
@@ -90,29 +90,51 @@ export default function LessonPage() {
   const module = lesson ? state.modules.find(m => m.id === lesson.module_id) : null;
   const status = lesson ? getLessonStatus(lesson.id) : 'not_started';
 
-  const savedProgress = lesson ? state.lessonProgress.find(p => p.lesson_id === lesson.id) : null;
-  const startSec = savedProgress?.last_position || 0;
+  const iframeRefs = useRef<(HTMLIFrameElement | null)[]>([]);
+
+  // Parse video list from JSON or fallback to single URL
+  const videos = useMemo(() => {
+    if (!lesson?.video_url) return [];
+    try {
+      const parsed = JSON.parse(lesson.video_url);
+      if (Array.isArray(parsed)) {
+        return parsed.map(v => ({ title: v.title || '', url: v.url || '' })).filter(v => v.url);
+      }
+    } catch { /* ignore */ }
+    return [{ title: 'Main Video', url: lesson.video_url }];
+  }, [lesson?.video_url]);
+
+  const getSavedPosition = (url: string): number => {
+    const key = `academy_resume_${url}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) return parseInt(saved, 10) || 0;
+    } catch { /* ignore */ }
+    return 0;
+  };
 
   const [showToast, setShowToast] = useState(false);
   const [completing, setCompleting] = useState(false);
 
-  // Track the ref to avoid state changes firing on stale functions
-  const onVideoTimeUpdate = useCallback((time: number) => {
+  // Track time updates per video URL
+  const onVideoTimeUpdate = useCallback((videoUrl: string, time: number) => {
     if (!lesson) return;
-    const prevPosition = savedProgress?.last_position || 0;
+    const storageKey = `academy_resume_${videoUrl}`;
+    const prevPos = parseInt(localStorage.getItem(storageKey) || '0', 10);
     
     // Save progress updates every 4 seconds to reduce redundant database triggers
-    if (Math.abs(time - prevPosition) >= 4) {
+    if (Math.abs(time - prevPos) >= 4) {
+      localStorage.setItem(storageKey, time.toString());
       dispatch({
         type: 'UPDATE_LESSON_PROGRESS',
         payload: { lessonId: lesson.id, lastPosition: time },
       });
     }
-  }, [lesson, savedProgress, dispatch]);
+  }, [lesson, dispatch]);
 
   // Handle messages from the embedded YouTube JSAPI
   useEffect(() => {
-    if (!lesson) return;
+    if (!lesson || !videos.length) return;
 
     const handleMessage = (event: MessageEvent) => {
       try {
@@ -123,7 +145,14 @@ export default function LessonPage() {
         if (data && data.event === 'infoDelivery' && data.info && typeof data.info.currentTime === 'number') {
           const time = Math.floor(data.info.currentTime);
           if (time > 0) {
-            onVideoTimeUpdate(time);
+            // Find which iframe sent this event
+            const idx = iframeRefs.current.findIndex(el => el && el.contentWindow === event.source);
+            if (idx !== -1) {
+              const video = videos[idx];
+              if (video) {
+                onVideoTimeUpdate(video.url, time);
+              }
+            }
           }
         }
       } catch { /* ignore parsing errors of unrelated messages */ }
@@ -131,7 +160,7 @@ export default function LessonPage() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [lesson?.id, onVideoTimeUpdate]);
+  }, [lesson?.id, videos, onVideoTimeUpdate]);
 
   const handleComplete = useCallback(() => {
     if (!lesson || status === 'completed' || completing) return;
@@ -274,51 +303,78 @@ export default function LessonPage() {
         </div>
       </div>
 
-      {/* ── Mobile-Optimized Video Container ── */}
-      {lesson.video_url && (
-        <div
-          className="a-fadeUp"
-          style={{
-            position: 'relative',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            marginBottom: startSec > 0 ? 10 : 20,
-            border: '1px solid var(--border-mid)',
-            background: '#000',
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
-          }}
-        >
-          <iframe
-            src={getEmbedUrl(lesson.video_url, startSec)}
-            style={{ width: '100%', aspectRatio: '16/9', border: 'none', display: 'block' }}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            title={lesson.title}
-          />
-        </div>
-      )}
+      {/* ── Videos Stack ── */}
+      {videos.map((vid, idx) => {
+        const savedPos = getSavedPosition(vid.url);
+        const hasResume = savedPos > 0;
 
-      {/* ── Auto-Resume Notification Badge ── */}
-      {startSec > 0 && (
-        <div 
-          className="a-fadeIn"
-          style={{ 
-            fontSize: '0.7rem', 
-            color: 'var(--gold-bright)', 
-            fontWeight: 600, 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            gap: 4, 
-            marginBottom: 20,
-            background: 'rgba(201, 162, 39, 0.05)',
-            border: '1px solid rgba(201, 162, 39, 0.15)',
-            borderRadius: '6px',
-            padding: '3px 8px'
-          }}
-        >
-          <span>•</span> Resumed from {formatTime(startSec)}
-        </div>
-      )}
+        return (
+          <div
+            key={idx}
+            className="a-fadeUp"
+            style={{
+              marginBottom: 24,
+              animationDelay: `${idx * 100}ms`,
+            }}
+          >
+            {/* Sub-title and resume info */}
+            {(videos.length > 1 || (vid.title && vid.title !== 'Main Video')) && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-1)' }}>
+                  {vid.title || `Video ${idx + 1}`}
+                </h3>
+                {hasResume && (
+                  <span style={{ fontSize: '0.7rem', color: 'var(--gold-bright)', fontWeight: 600 }}>
+                    • Resumed from {formatTime(savedPos)}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {videos.length === 1 && vid.title === 'Main Video' && hasResume && (
+              <div 
+                className="a-fadeIn"
+                style={{ 
+                  fontSize: '0.7rem', 
+                  color: 'var(--gold-bright)', 
+                  fontWeight: 600, 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: 4, 
+                  marginBottom: 10,
+                  background: 'rgba(201, 162, 39, 0.05)',
+                  border: '1px solid rgba(201, 162, 39, 0.15)',
+                  borderRadius: '6px',
+                  padding: '3px 8px'
+                }}
+              >
+                <span>•</span> Resumed from {formatTime(savedPos)}
+              </div>
+            )}
+
+            {/* Video Player */}
+            <div
+              style={{
+                position: 'relative',
+                borderRadius: 'var(--radius-lg)',
+                overflow: 'hidden',
+                border: '1px solid var(--border-mid)',
+                background: '#000',
+                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
+              }}
+            >
+              <iframe
+                ref={el => { iframeRefs.current[idx] = el; }}
+                src={getEmbedUrl(vid.url, savedPos)}
+                style={{ width: '100%', aspectRatio: '16/9', border: 'none', display: 'block' }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                title={vid.title || lesson.title}
+              />
+            </div>
+          </div>
+        );
+      })}
 
       {/* ── Content ── */}
       {lesson.content.trim() && (
