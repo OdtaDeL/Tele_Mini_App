@@ -218,6 +218,7 @@ export default function LessonPage() {
 
     const fmt = (t: string) =>
       t
+        .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%; height:auto; border-radius:var(--radius-md); margin:12px 0; border:1px solid var(--border); display:block;" />')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
         .replace(/`(.+?)`/g, '<code>$1</code>')
@@ -302,6 +303,28 @@ export default function LessonPage() {
           }} />
         </div>
       </div>
+
+      {/* ── Lesson Thumbnail / Header Image ── */}
+      {lesson.thumbnail && (
+        <div
+          className="a-fadeUp"
+          style={{
+            position: 'relative',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            marginBottom: 20,
+            border: '1px solid var(--border-mid)',
+            background: 'var(--bg-surface)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          <img
+            src={lesson.thumbnail}
+            alt={lesson.title}
+            style={{ width: '100%', height: 'auto', display: 'block', maxHeight: '280px', objectFit: 'cover' }}
+          />
+        </div>
+      )}
 
       {/* ── Videos Stack ── */}
       {videos.map((vid, idx) => {
