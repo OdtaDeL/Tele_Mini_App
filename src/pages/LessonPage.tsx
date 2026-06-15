@@ -9,10 +9,10 @@ function getEmbedUrl(url: string | undefined, startSeconds: number = 0): string 
 
   const jsapiParam = 'enablejsapi=1';
 
-  // If already an embed URL, append jsapi and start position parameters
+  // If already an embed URL, append jsapi, modestbranding and start position parameters
   if (url.includes('/embed/')) {
     const separator = url.includes('?') ? '&' : '?';
-    let resUrl = `${url}${separator}${jsapiParam}`;
+    let resUrl = `${url}${separator}${jsapiParam}&modestbranding=1`;
     if (startSeconds > 0 && !url.includes('start=')) {
       resUrl += `&start=${startSeconds}`;
     }
@@ -36,7 +36,7 @@ function getEmbedUrl(url: string | undefined, startSeconds: number = 0): string 
       startParam = `&start=${startSeconds}`;
     }
     
-    return `https://www.youtube.com/embed/${videoId}?rel=0&${jsapiParam}${startParam}`;
+    return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&${jsapiParam}${startParam}`;
   }
 
   return url;
@@ -392,6 +392,7 @@ export default function LessonPage() {
                 style={{ width: '100%', aspectRatio: '16/9', border: 'none', display: 'block' }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-presentation"
                 title={vid.title || lesson.title}
               />
             </div>
