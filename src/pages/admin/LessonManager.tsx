@@ -13,6 +13,7 @@ export default function LessonManager() {
     description: '',
     content: '',
     module_id: '',
+    thumbnail: '',
     videos: [{ title: '', url: '' }] as { title: string; url: string }[],
   });
 
@@ -35,6 +36,7 @@ export default function LessonManager() {
           description: form.description,
           content: form.content,
           module_id: form.module_id,
+          thumbnail: form.thumbnail,
           video_url: videoUrlValue,
         },
       });
@@ -46,7 +48,7 @@ export default function LessonManager() {
         description: form.description,
         content: form.content,
         module_id: form.module_id,
-        thumbnail: '',
+        thumbnail: form.thumbnail,
         order: moduleLessons.length + 1,
         video_url: videoUrlValue,
       };
@@ -57,7 +59,7 @@ export default function LessonManager() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', description: '', content: '', module_id: '', videos: [{ title: '', url: '' }] });
+    setForm({ title: '', description: '', content: '', module_id: '', thumbnail: '', videos: [{ title: '', url: '' }] });
     setEditing(null);
     setShowForm(false);
   };
@@ -84,6 +86,7 @@ export default function LessonManager() {
       description: lesson.description,
       content: lesson.content,
       module_id: lesson.module_id,
+      thumbnail: lesson.thumbnail || '',
       videos: parsedVideos,
     });
     setShowForm(true);
@@ -150,6 +153,12 @@ export default function LessonManager() {
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               placeholder="Short Description"
+            />
+            <input
+              className="input"
+              value={form.thumbnail}
+              onChange={(e) => setForm({ ...form, thumbnail: e.target.value })}
+              placeholder="Thumbnail / Header Image URL (optional)"
             />
             <textarea
               className="input textarea"
